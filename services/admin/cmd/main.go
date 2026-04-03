@@ -11,6 +11,10 @@ import (
 
 	"chatsem/services/admin/internal/config"
 	"chatsem/services/admin/internal/handler"
+	"chatsem/services/admin/internal/repository/postgres"
+	"chatsem/services/admin/internal/service"
+
+	pgx "github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -26,7 +30,21 @@ func main() {
 	cfg := config.Load()
 	slog.Info("service starting", "service", "admin", "addr", cfg.Addr, "version", buildVersion, "built_at", buildTime)
 
-	r := handler.NewRouter()
+	// Database pool
+	pool, err := pgx.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database: connection failed", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	slog.Debug("database: connected")
+
+	// Repositories and services
+	eventRepo := postgres.NewEventRepo(pool)
+	chatRepo := postgres.NewChatRepo(pool)
+	eventSvc := service.NewEventService(eventRepo, chatRepo)
+
+	r := handler.NewRouter(cfg.JWTSecret, eventSvc)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,

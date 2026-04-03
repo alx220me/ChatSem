@@ -114,3 +114,16 @@ func (r *ChatRepo) InitChatSeq(ctx context.Context, chatID uuid.UUID) error {
 	}
 	return nil
 }
+
+// CreateParent inserts a new parent chat for an event and returns its ID.
+func (r *ChatRepo) CreateParent(ctx context.Context, eventID uuid.UUID) (uuid.UUID, error) {
+	slog.Debug("[AdminChatRepo.CreateParent] insert", "event_id", eventID)
+	var chatID uuid.UUID
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO chats (event_id, type) VALUES ($1, 'parent') RETURNING id`, eventID).Scan(&chatID)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("AdminChatRepo.CreateParent: %w", err)
+	}
+	slog.Debug("[AdminChatRepo.CreateParent] created", "chat_id", chatID)
+	return chatID, nil
+}
