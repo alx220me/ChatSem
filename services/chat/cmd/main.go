@@ -12,7 +12,10 @@ import (
 	"chatsem/services/chat/internal/broker"
 	"chatsem/services/chat/internal/config"
 	"chatsem/services/chat/internal/handler"
+	"chatsem/services/chat/internal/repository/postgres"
+	"chatsem/services/chat/internal/service"
 
+	pgx "github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -43,10 +46,24 @@ func main() {
 	// Message broker
 	b := broker.NewRedisBroker(rdb)
 	slog.Debug("broker: initialized")
+	_ = b // broker will be injected into poll handler in long-polling milestone
+
+	// Database pool
+	pool, err := pgx.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database: connection failed", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	slog.Debug("database: connected")
+
+	// Repositories and services
+	chatRepo := postgres.NewChatRepo(pool)
+	eventRepo := postgres.NewEventRepo(pool)
+	chatSvc := service.NewChatService(chatRepo)
 
 	// HTTP router
-	r := handler.NewRouter()
-	_ = b // broker will be injected into handlers in later milestones
+	r := handler.NewRouter(cfg.JWTSecret, chatSvc, eventRepo)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,
