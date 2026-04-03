@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	chatsem/shared v0.0.0
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
 )

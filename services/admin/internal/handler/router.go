@@ -12,7 +12,7 @@ import (
 )
 
 // NewRouter creates the chi router for the admin service with standard middleware.
-func NewRouter(jwtSecret string, eventSvc *service.EventService) http.Handler {
+func NewRouter(jwtSecret string, eventSvc *service.EventService, banSvc *service.BanService) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimiddleware.RealIP)
@@ -24,6 +24,7 @@ func NewRouter(jwtSecret string, eventSvc *service.EventService) http.Handler {
 	})
 
 	eventH := NewEventHandler(eventSvc)
+	banH := NewBanHandler(banSvc)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(jwtSecret))
@@ -39,6 +40,9 @@ func NewRouter(jwtSecret string, eventSvc *service.EventService) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireRole("admin", "moderator"))
 			r.Get("/api/admin/events", eventH.ListEvents)
+			r.Post("/api/admin/bans", banH.CreateBan)
+			r.Delete("/api/admin/bans/{banID}", banH.DeleteBan)
+			r.Get("/api/admin/events/{eventID}/bans", banH.ListBans)
 		})
 	})
 

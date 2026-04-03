@@ -28,6 +28,7 @@ type ChatRepository interface {
 // MessageRepository manages message persistence.
 type MessageRepository interface {
 	Create(ctx context.Context, m *Message) error
+	GetByID(ctx context.Context, id uuid.UUID) (*Message, error)
 	GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*Message, error)
 	ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*Message, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error
