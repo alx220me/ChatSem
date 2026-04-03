@@ -22,6 +22,7 @@ type ChatRepository interface {
 	ListByEventID(ctx context.Context, eventID uuid.UUID) ([]*Chat, error)
 	GetSettings(ctx context.Context, chatID uuid.UUID) ([]byte, error)
 	UpdateSettings(ctx context.Context, chatID uuid.UUID, settings []byte) error
+	InitChatSeq(ctx context.Context, chatID uuid.UUID) error
 }
 
 // MessageRepository manages message persistence.

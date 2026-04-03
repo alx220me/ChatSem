@@ -104,3 +104,13 @@ func (r *ChatRepo) UpdateSettings(ctx context.Context, chatID uuid.UUID, setting
 	slog.Debug("[AdminChatRepo.UpdateSettings] done", "chat_id", chatID)
 	return nil
 }
+
+// InitChatSeq inserts the initial seq counter row for a newly created chat.
+func (r *ChatRepo) InitChatSeq(ctx context.Context, chatID uuid.UUID) error {
+	slog.Debug("[AdminChatRepo.InitChatSeq] init", "chat_id", chatID)
+	_, err := r.db.Exec(ctx, `INSERT INTO chat_seqs (chat_id, last_seq) VALUES ($1, 0)`, chatID)
+	if err != nil {
+		return fmt.Errorf("AdminChatRepo.InitChatSeq: %w", err)
+	}
+	return nil
+}
