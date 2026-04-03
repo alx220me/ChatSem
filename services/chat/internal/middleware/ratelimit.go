@@ -16,6 +16,8 @@ import (
 const (
 	ipRateLimit         = 100
 	ipRateWindow        = 60 * time.Second
+	pollRateLimit       = 60
+	pollRateWindow      = 60 * time.Second
 	msgRateLimit        = 10
 	msgRateWindow       = 10 * time.Second
 	moderatorMultiplier = 3
@@ -53,6 +55,31 @@ func IPRateLimit(rdb *redis.Client) func(http.Handler) http.Handler {
 				slog.Warn("[IPRateLimit] exceeded", "ip", ip)
 				w.Header().Set("Retry-After", "60")
 				response.Error(w, http.StatusTooManyRequests, "rate_limited", "too many requests")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// PollIPRateLimit limits poll requests per client IP to 60 per 60 seconds.
+func PollIPRateLimit(rdb *redis.Client) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if rdb == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ip := r.RemoteAddr
+			key := fmt.Sprintf("rl:poll:%s", ip)
+			ok, err := allow(r.Context(), rdb, key, pollRateLimit, pollRateWindow)
+			if err != nil {
+				slog.Warn("[PollIPRateLimit] redis error, failing open", "err", err, "ip", ip)
+			}
+			if !ok {
+				slog.Warn("[PollIPRateLimit] exceeded", "ip", ip)
+				w.Header().Set("Retry-After", "60")
+				response.Error(w, http.StatusTooManyRequests, "rate_limited", "poll rate limit exceeded")
 				return
 			}
 			next.ServeHTTP(w, r)

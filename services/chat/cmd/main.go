@@ -66,7 +66,7 @@ func main() {
 	msgSvc := service.NewMessageService(msgRepo, muteRepo, b, rdb)
 
 	// HTTP router
-	r := handler.NewRouter(cfg.JWTSecret, chatSvc, msgSvc, eventRepo, rdb)
+	r := handler.NewRouter(cfg.JWTSecret, chatSvc, msgSvc, eventRepo, msgRepo, b, rdb)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,

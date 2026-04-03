@@ -6,6 +6,7 @@ import (
 	"chatsem/services/chat/internal/middleware"
 	"chatsem/services/chat/internal/service"
 	"chatsem/shared/domain"
+	"chatsem/shared/pkg/longpoll"
 	"chatsem/shared/pkg/response"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +20,8 @@ func NewRouter(
 	chatSvc *service.ChatService,
 	msgSvc *service.MessageService,
 	eventRepo domain.EventRepository,
+	msgRepo domain.MessageRepository,
+	broker longpoll.Broker,
 	rdb *redis.Client,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -34,6 +37,7 @@ func NewRouter(
 
 	chatH := NewChatHandler(chatSvc)
 	msgH := NewMessageHandler(msgSvc)
+	pollH := NewPollHandler(broker, msgRepo)
 
 	// Public endpoint — no auth required.
 	r.Get("/api/chat/events/{eventID}/chats", chatH.ListChats)
@@ -56,6 +60,12 @@ func NewRouter(
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.MessageRateLimit(rdb))
 			r.Post("/api/chat/{chatID}/messages", msgH.Send)
+		})
+
+		// Long poll with per-IP rate limit
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.PollIPRateLimit(rdb))
+			r.Get("/api/chat/{chatID}/poll", pollH.Poll)
 		})
 	})
 
