@@ -1,0 +1,19 @@
+# Build artifacts
+bin/
+*.exe
+services/*/main
+services/*/cmd/main
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+deploy/.env
+
+# Go workspace sum
+go.work.sum
+
+# OS
+.DS_Store
