@@ -23,17 +23,16 @@ func BanCheck(rdb *redis.Client) func(http.Handler) http.Handler {
 			}
 
 			slog.Debug("[BanCheck] checking", "event_id", claims.EventID, "user_id", claims.UserID)
-			key := fmt.Sprintf("ban:%s:%s", claims.EventID, claims.UserID)
-			exists, err := rdb.Exists(r.Context(), key).Result()
-			if err != nil {
-				slog.Warn("[BanCheck] redis error, failing open", "err", err, "user_id", claims.UserID)
-				next.ServeHTTP(w, r)
-				return
-			}
-			if exists > 0 {
-				slog.Warn("[BanCheck] user banned", "event_id", claims.EventID, "user_id", claims.UserID)
-				response.Error(w, http.StatusForbidden, "banned", "user is banned from this event")
-				return
+			if rdb != nil {
+				key := fmt.Sprintf("ban:%s:%s", claims.EventID, claims.UserID)
+				exists, err := rdb.Exists(r.Context(), key).Result()
+				if err != nil {
+					slog.Warn("[BanCheck] redis error, failing open", "err", err, "user_id", claims.UserID)
+				} else if exists > 0 {
+					slog.Warn("[BanCheck] user banned", "event_id", claims.EventID, "user_id", claims.UserID)
+					response.Error(w, http.StatusForbidden, "banned", "user is banned from this event")
+					return
+				}
 			}
 			next.ServeHTTP(w, r)
 		})

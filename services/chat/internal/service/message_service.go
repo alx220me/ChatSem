@@ -48,13 +48,15 @@ func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventI
 	}
 
 	// Ban check via Redis (fast path, fail-open).
-	banKey := fmt.Sprintf("ban:%s:%s", eventID, userID)
-	exists, err := s.rdb.Exists(ctx, banKey).Result()
-	if err != nil {
-		slog.Warn("[MessageService.SendMessage] redis ban check failed, failing open", "err", err)
-	} else if exists > 0 {
-		slog.Warn("[MessageService.SendMessage] user is banned", "user_id", userID, "event_id", eventID)
-		return nil, domain.ErrUserBanned
+	if s.rdb != nil {
+		banKey := fmt.Sprintf("ban:%s:%s", eventID, userID)
+		exists, err := s.rdb.Exists(ctx, banKey).Result()
+		if err != nil {
+			slog.Warn("[MessageService.SendMessage] redis ban check failed, failing open", "err", err)
+		} else if exists > 0 {
+			slog.Warn("[MessageService.SendMessage] user is banned", "user_id", userID, "event_id", eventID)
+			return nil, domain.ErrUserBanned
+		}
 	}
 
 	// Mute check via DB.
