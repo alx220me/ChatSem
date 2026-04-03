@@ -1,6 +1,8 @@
 # Build artifacts
 bin/
 *.exe
+services/*/main
+services/*/cmd/main
 
 # IDE
 .idea/
