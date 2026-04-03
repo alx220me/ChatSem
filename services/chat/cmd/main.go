@@ -60,10 +60,13 @@ func main() {
 	// Repositories and services
 	chatRepo := postgres.NewChatRepo(pool)
 	eventRepo := postgres.NewEventRepo(pool)
+	msgRepo := postgres.NewMessageRepo(pool)
+	muteRepo := postgres.NewMuteRepo(pool)
 	chatSvc := service.NewChatService(chatRepo)
+	msgSvc := service.NewMessageService(msgRepo, muteRepo, b, rdb)
 
 	// HTTP router
-	r := handler.NewRouter(cfg.JWTSecret, chatSvc, eventRepo)
+	r := handler.NewRouter(cfg.JWTSecret, chatSvc, msgSvc, eventRepo, rdb)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,

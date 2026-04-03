@@ -137,6 +137,19 @@ func (r *MessageRepo) CountByChatRange(ctx context.Context, chatID uuid.UUID, fr
 	return count, nil
 }
 
+// GetByID returns a single message by its ID (including soft-deleted).
+func (r *MessageRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+	slog.Debug("[MessageRepo.GetByID] query", "message_id", id)
+	row := r.db.QueryRow(ctx, `
+		SELECT id, chat_id, user_id, text, seq, created_at, deleted_at
+		FROM messages WHERE id = $1`, id)
+	m := &domain.Message{}
+	if err := row.Scan(&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt); err != nil {
+		return nil, fmt.Errorf("MessageRepo.GetByID: %w", err)
+	}
+	return m, nil
+}
+
 // scanMessages scans pgx rows into a slice of *domain.Message.
 func scanMessages(rows interface {
 	Next() bool

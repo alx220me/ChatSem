@@ -15,6 +15,7 @@ import (
 	"chatsem/services/admin/internal/service"
 
 	pgx "github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -39,12 +40,22 @@ func main() {
 	defer pool.Close()
 	slog.Debug("database: connected")
 
+	// Redis client for ban cache
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := rdb.Ping(ctx2).Err(); err != nil {
+		slog.Warn("redis: ping failed, ban cache unavailable", "addr", cfg.RedisAddr, "err", err)
+	}
+	cancel2()
+
 	// Repositories and services
 	eventRepo := postgres.NewEventRepo(pool)
 	chatRepo := postgres.NewChatRepo(pool)
+	banRepo := postgres.NewBanRepo(pool)
 	eventSvc := service.NewEventService(eventRepo, chatRepo)
+	banSvc := service.NewBanService(banRepo, rdb)
 
-	r := handler.NewRouter(cfg.JWTSecret, eventSvc)
+	r := handler.NewRouter(cfg.JWTSecret, eventSvc, banSvc)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,
