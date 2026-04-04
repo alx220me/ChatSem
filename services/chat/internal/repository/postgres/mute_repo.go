@@ -104,7 +104,7 @@ func (r *MuteRepo) IsUserMuted(ctx context.Context, userID, chatID uuid.UUID) (b
 	var count int
 	err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM mutes
-		WHERE user_id = $1 AND chat_id = $2 AND expires_at > NOW()`,
+		WHERE user_id = $1 AND chat_id = $2 AND (expires_at IS NULL OR expires_at > NOW())`,
 		userID, chatID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("ChatMuteRepo.IsUserMuted: %w", err)
