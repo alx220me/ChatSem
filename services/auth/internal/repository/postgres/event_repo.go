@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,6 +32,9 @@ func (r *EventRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Event, e
 
 	e := &domain.Event{}
 	if err := row.Scan(&e.ID, &e.Name, &e.Settings, &e.AllowedOrigin, &e.APISecret, &e.CreatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("AuthEventRepo.GetByID: %w", domain.ErrNotFound)
+		}
 		return nil, fmt.Errorf("AuthEventRepo.GetByID: %w", err)
 	}
 	slog.Debug("[AuthEventRepo.GetByID] found", "event_id", id, "name", e.Name)

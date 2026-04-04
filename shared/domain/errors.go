@@ -11,4 +11,6 @@ var (
 	ErrInvalidFormat   = errors.New("invalid export format")
 	ErrEmptyMessage    = errors.New("message text is empty")
 	ErrMessageTooLong  = errors.New("message text exceeds 4096 characters")
+	ErrInvalidSecret   = errors.New("invalid api secret")
+	ErrInvalidRole     = errors.New("invalid role")
 )
