@@ -55,6 +55,10 @@ type mockMuteRepo struct {
 
 func (m *mockMuteRepo) Create(ctx context.Context, mute *domain.Mute) error { return nil }
 func (m *mockMuteRepo) Delete(ctx context.Context, id uuid.UUID) error       { return nil }
+func (m *mockMuteRepo) GetActive(ctx context.Context, chatID, userID uuid.UUID) (*domain.Mute, error) {
+	return nil, domain.ErrNotFound
+}
+func (m *mockMuteRepo) Expire(ctx context.Context, muteID uuid.UUID) error { return nil }
 func (m *mockMuteRepo) ListByChatID(ctx context.Context, chatID uuid.UUID) ([]*domain.Mute, error) {
 	return nil, nil
 }
