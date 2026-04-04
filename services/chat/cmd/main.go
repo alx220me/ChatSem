@@ -46,7 +46,6 @@ func main() {
 	// Message broker
 	b := broker.NewRedisBroker(rdb)
 	slog.Debug("broker: initialized")
-	_ = b // broker will be injected into poll handler in long-polling milestone
 
 	// Database pool
 	pool, err := pgx.New(context.Background(), cfg.DatabaseURL)
