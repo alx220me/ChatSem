@@ -76,6 +76,26 @@ func (s *EventService) createParentChat(ctx context.Context, eventID uuid.UUID) 
 	return nil
 }
 
+// ListChats returns all chats (parent + children) for an event.
+func (s *EventService) ListChats(ctx context.Context, eventID uuid.UUID) ([]*domain.Chat, error) {
+	slog.Debug("[EventService.ListChats] start", "event_id", eventID)
+	chats, err := s.chats.ListByEventID(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("EventService.ListChats: %w", err)
+	}
+	return chats, nil
+}
+
+// UpdateChatSettings applies a JSONB settings patch to a chat.
+func (s *EventService) UpdateChatSettings(ctx context.Context, chatID uuid.UUID, settings []byte) error {
+	slog.Debug("[EventService.UpdateChatSettings] start", "chat_id", chatID)
+	if err := s.chats.UpdateSettings(ctx, chatID, settings); err != nil {
+		return fmt.Errorf("EventService.UpdateChatSettings: %w", err)
+	}
+	slog.Info("[EventService.UpdateChatSettings] updated", "chat_id", chatID)
+	return nil
+}
+
 // ListEvents returns all events with pagination.
 func (s *EventService) ListEvents(ctx context.Context) ([]*domain.Event, error) {
 	slog.Debug("[EventService.ListEvents] start")

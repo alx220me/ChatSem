@@ -12,7 +12,13 @@ import (
 )
 
 // NewRouter creates the chi router for the admin service with standard middleware.
-func NewRouter(jwtSecret string, eventSvc *service.EventService, banSvc *service.BanService) http.Handler {
+func NewRouter(
+	jwtSecret string,
+	eventSvc *service.EventService,
+	banSvc *service.BanService,
+	muteSvc *service.MuteService,
+	userSvc *service.UserService,
+) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimiddleware.RealIP)
@@ -25,6 +31,9 @@ func NewRouter(jwtSecret string, eventSvc *service.EventService, banSvc *service
 
 	eventH := NewEventHandler(eventSvc)
 	banH := NewBanHandler(banSvc)
+	muteH := NewMuteHandler(muteSvc)
+	chatH := NewChatHandler(eventSvc)
+	userH := NewUserHandler(userSvc)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(jwtSecret))
@@ -34,15 +43,22 @@ func NewRouter(jwtSecret string, eventSvc *service.EventService, banSvc *service
 			r.Use(middleware.RequireRole("admin"))
 			r.Post("/api/admin/events", eventH.CreateEvent)
 			r.Post("/api/admin/events/{eventID}/chat", eventH.CreateParentChat)
+			r.Patch("/api/admin/chats/{chatID}/settings", chatH.UpdateSettings)
+			r.Patch("/api/admin/users/{userID}/role", userH.UpdateRole)
 		})
 
 		// Admin and moderator endpoints
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireRole("admin", "moderator"))
 			r.Get("/api/admin/events", eventH.ListEvents)
+			r.Get("/api/admin/events/{eventID}/chats", chatH.ListChats)
+			r.Get("/api/admin/events/{eventID}/users", userH.List)
 			r.Post("/api/admin/bans", banH.CreateBan)
 			r.Delete("/api/admin/bans/{banID}", banH.DeleteBan)
 			r.Get("/api/admin/events/{eventID}/bans", banH.ListBans)
+			r.Post("/api/admin/mutes", muteH.CreateMute)
+			r.Delete("/api/admin/mutes/{muteID}", muteH.DeleteMute)
+			r.Get("/api/admin/chats/{chatID}/mutes", muteH.ListMutes)
 		})
 	})
 

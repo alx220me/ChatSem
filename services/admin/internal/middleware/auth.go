@@ -28,7 +28,7 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 			claims, err := jwt.ValidateToken(tokenStr, jwtSecret)
 			if err != nil {
 				slog.Warn("[AdminAuthMiddleware] invalid token", "err", err)
-				response.Error(w, http.StatusUnauthorized, "unauthorized", err.Error())
+				response.Error(w, http.StatusUnauthorized, "unauthorized", "invalid or expired token")
 				return
 			}
 			slog.Debug("[AdminAuthMiddleware] validated", "user_id", claims.UserID, "role", claims.Role)
