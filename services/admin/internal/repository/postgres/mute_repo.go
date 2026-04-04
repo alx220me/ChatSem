@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -69,6 +71,37 @@ func (r *MuteRepo) ListByChatID(ctx context.Context, chatID uuid.UUID) ([]*domai
 	}
 	slog.Debug("[MuteRepo.ListByChatID] fetched", "count", len(mutes))
 	return mutes, rows.Err()
+}
+
+// GetActive returns the active mute for user in chat, or domain.ErrNotFound if none.
+func (r *MuteRepo) GetActive(ctx context.Context, chatID, userID uuid.UUID) (*domain.Mute, error) {
+	slog.Debug("[MuteRepo.GetActive] checking", "chat_id", chatID, "user_id", userID)
+	row := r.db.QueryRow(ctx, `
+		SELECT id, chat_id, user_id, muted_by, reason, created_at, expires_at
+		FROM mutes
+		WHERE chat_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > NOW())
+		LIMIT 1`, chatID, userID)
+
+	m := &domain.Mute{}
+	if err := row.Scan(&m.ID, &m.ChatID, &m.UserID, &m.MutedBy, &m.Reason, &m.CreatedAt, &m.ExpiresAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("MuteRepo.GetActive: %w", domain.ErrNotFound)
+		}
+		return nil, fmt.Errorf("MuteRepo.GetActive: %w", err)
+	}
+	slog.Debug("[MuteRepo.GetActive] found", "mute_id", m.ID)
+	return m, nil
+}
+
+// Expire sets expires_at = NOW() for the given mute (soft expiry).
+func (r *MuteRepo) Expire(ctx context.Context, muteID uuid.UUID) error {
+	slog.Debug("[MuteRepo.Expire] expiring", "mute_id", muteID)
+	_, err := r.db.Exec(ctx, `UPDATE mutes SET expires_at = NOW() WHERE id = $1`, muteID)
+	if err != nil {
+		return fmt.Errorf("MuteRepo.Expire: %w", err)
+	}
+	slog.Debug("[MuteRepo.Expire] done", "mute_id", muteID)
+	return nil
 }
 
 // IsUserMuted returns true if the user has an active mute in the chat.

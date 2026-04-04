@@ -57,6 +57,8 @@ type BanRepository interface {
 type MuteRepository interface {
 	Create(ctx context.Context, m *Mute) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	GetActive(ctx context.Context, chatID, userID uuid.UUID) (*Mute, error)
+	Expire(ctx context.Context, muteID uuid.UUID) error
 	ListByChatID(ctx context.Context, chatID uuid.UUID) ([]*Mute, error)
 	IsUserMuted(ctx context.Context, userID, chatID uuid.UUID) (bool, error)
 }

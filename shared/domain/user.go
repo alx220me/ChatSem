@@ -37,13 +37,13 @@ type Ban struct {
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"` // nil = permanent
 }
 
-// Mute records a temporary mute of a user within a chat.
+// Mute records a mute of a user within a chat. ExpiresAt nil means permanent.
 type Mute struct {
-	ID        uuid.UUID `json:"id"`
-	ChatID    uuid.UUID `json:"chatId"`
-	UserID    uuid.UUID `json:"userId"`
-	MutedBy   uuid.UUID `json:"mutedBy"`
-	Reason    string    `json:"reason,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	ID        uuid.UUID  `json:"id"`
+	ChatID    uuid.UUID  `json:"chatId"`
+	UserID    uuid.UUID  `json:"userId"`
+	MutedBy   uuid.UUID  `json:"mutedBy"`
+	Reason    string     `json:"reason,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"` // nil = permanent
 }
