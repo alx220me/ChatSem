@@ -29,3 +29,4 @@
 | Long Polling | — |
 | Admin Service | — |
 | Auth Service | 2026-04-04 |
+| React Widget MVP | 2026-04-04 |
