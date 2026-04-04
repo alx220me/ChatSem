@@ -53,9 +53,37 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
 
   const handleSend = useCallback(
     async (text: string) => {
-      await sendMessage(text)
+      if (!chat) return
+
+      // Optimistic message — show immediately in allMessages
+      const optimisticId = `opt-${Date.now()}`
+      const optimistic: Message = {
+        id: optimisticId,
+        chatId: chat.id,
+        userId: '',
+        text,
+        seq: -1,
+        createdAt: new Date().toISOString(),
+      }
+      setAllMessages((prev) => [...prev, optimistic])
+
+      try {
+        const response = await sendMessage(text)
+        // Replace optimistic entry with confirmed data
+        setAllMessages((prev) =>
+          prev.map((m) =>
+            m.id === optimisticId
+              ? { ...m, id: response.id, seq: response.seq, createdAt: response.ts }
+              : m,
+          ),
+        )
+      } catch (err) {
+        // Remove optimistic message on failure
+        setAllMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+        throw err
+      }
     },
-    [sendMessage],
+    [chat, sendMessage],
   )
 
   return (

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ApiClient } from '../api/client'
-import type { Chat, Message } from '../types'
+import type { Chat, Message, SendResponse } from '../types'
 
 interface UseChatResult {
   chat: Chat | null
   messages: Message[]
   loading: boolean
   error: string | null
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (text: string) => Promise<SendResponse>
 }
 
 export function useChat(
@@ -73,34 +73,11 @@ export function useChat(
   }, [api, eventId, roomId])
 
   const sendMessage = useCallback(
-    async (text: string) => {
-      if (!chat) return
-
-      // Optimistic message with seq=-1
-      const optimisticId = `optimistic-${Date.now()}`
-      const optimistic: Message = {
-        id: optimisticId,
-        chatId: chat.id,
-        userId: '',
-        text,
-        seq: -1,
-        createdAt: new Date().toISOString(),
-      }
-
-      setMessages((prev) => [...prev, optimistic])
-
+    async (text: string): Promise<SendResponse> => {
+      if (!chat) throw new Error('no active chat')
       try {
-        const response = await api.sendMessage(chat.id, text)
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === optimisticId
-              ? { ...m, id: response.id, seq: response.seq, createdAt: response.ts }
-              : m,
-          ),
-        )
+        return await api.sendMessage(chat.id, text)
       } catch (err) {
-        // Remove optimistic message on error
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
         const msg = err instanceof Error ? err.message : String(err)
         console.warn('[useChat] sendMessage error', msg)
         throw err

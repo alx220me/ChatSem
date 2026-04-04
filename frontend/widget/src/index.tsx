@@ -23,7 +23,17 @@ window.ChatSem = {
     // Initialise module-level token storage
     initToken(config.token)
 
-    const api = new ApiClient('/api', getToken, config.onTokenExpired)
+    const api = new ApiClient(
+      '/api',
+      getToken,
+      config.onTokenExpired
+        ? async () => {
+            const newToken = await config.onTokenExpired!()
+            initToken(newToken)
+            return newToken
+          }
+        : undefined,
+    )
 
     createRoot(container).render(<ChatWindow config={config} api={api} />)
 
