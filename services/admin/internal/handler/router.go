@@ -18,6 +18,7 @@ func NewRouter(
 	banSvc *service.BanService,
 	muteSvc *service.MuteService,
 	userSvc *service.UserService,
+	exportSvc *service.ExportService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -34,6 +35,7 @@ func NewRouter(
 	muteH := NewMuteHandler(muteSvc)
 	chatH := NewChatHandler(eventSvc)
 	userH := NewUserHandler(userSvc)
+	exportH := NewExportHandler(exportSvc, jwtSecret)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(jwtSecret))
@@ -61,6 +63,9 @@ func NewRouter(
 			r.Get("/api/admin/chats/{chatID}/mutes", muteH.ListMutes)
 		})
 	})
+
+	// Export endpoint handles its own auth (supports ?token= for browser downloads).
+	r.Get("/api/admin/chats/{chatID}/export", exportH.Export)
 
 	return r
 }
