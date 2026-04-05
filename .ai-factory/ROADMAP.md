@@ -13,9 +13,9 @@
 - [x] **Auth Service** — SSO JWT validation with pre-shared secret, session store (Redis), token exchange
 - [x] **React Widget MVP** — embeddable React widget, long polling client, basic chat UI
 - [x] **Admin Service** — event/chat management API, moderation endpoints, ban/unban
-- [ ] **Admin Panel (React SPA)** — admin UI: events, chats, users, moderation, history export
-- [ ] **History Export** — CSV + JSON streaming download endpoint
-- [ ] **Production Readiness** — Docker multi-stage, docker-compose (all services + nginx), health checks, rate limiting
+- [x] **Admin Panel (React SPA)** — admin UI: events, chats, users, moderation, history export
+- [x] **History Export** — CSV + JSON streaming download endpoint
+- [x] **Production Readiness** — Docker multi-stage, docker-compose (all services + nginx), health checks, rate limiting
 
 ## Completed
 
@@ -30,3 +30,6 @@
 | Admin Service | — |
 | Auth Service | 2026-04-04 |
 | React Widget MVP | 2026-04-04 |
+| Admin Panel (React SPA) | 2026-04-05 |
+| History Export | 2026-04-05 |
+| Production Readiness | 2026-04-05 |
