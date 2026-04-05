@@ -46,10 +46,11 @@ func (r *MessageRepo) Create(ctx context.Context, m *domain.Message) error {
 func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error) {
 	slog.Debug("[MessageRepo.GetByChatIDAfterSeq] query", "chat_id", chatID, "after_seq", afterSeq, "limit", limit)
 	rows, err := r.db.Query(ctx, `
-		SELECT id, chat_id, user_id, text, seq, created_at, deleted_at
-		FROM messages
-		WHERE chat_id = $1 AND seq > $2 AND deleted_at IS NULL
-		ORDER BY seq ASC
+		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at
+		FROM messages m
+		LEFT JOIN users u ON u.id = m.user_id
+		WHERE m.chat_id = $1 AND m.seq > $2 AND m.deleted_at IS NULL
+		ORDER BY m.seq ASC
 		LIMIT $3`,
 		chatID, afterSeq, limit)
 	if err != nil {
@@ -69,10 +70,11 @@ func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID,
 func (r *MessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error) {
 	slog.Debug("[MessageRepo.ListByChatID] query", "chat_id", chatID, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
-		SELECT id, chat_id, user_id, text, seq, created_at, deleted_at
-		FROM messages
-		WHERE chat_id = $1 AND deleted_at IS NULL
-		ORDER BY seq DESC
+		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at
+		FROM messages m
+		LEFT JOIN users u ON u.id = m.user_id
+		WHERE m.chat_id = $1 AND m.deleted_at IS NULL
+		ORDER BY m.seq DESC
 		LIMIT $2 OFFSET $3`,
 		chatID, limit, offset)
 	if err != nil {
@@ -159,7 +161,7 @@ func scanMessages(rows interface {
 	var msgs []*domain.Message
 	for rows.Next() {
 		m := &domain.Message{}
-		if err := rows.Scan(&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ChatID, &m.UserID, &m.UserName, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
 		msgs = append(msgs, m)

@@ -30,10 +30,14 @@ func (r *ChatRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Chat, err
 
 	c := &domain.Chat{}
 	var parentID *uuid.UUID
-	if err := row.Scan(&c.ID, &c.EventID, &parentID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+	var extRoomID *string
+	if err := row.Scan(&c.ID, &c.EventID, &parentID, &extRoomID, &c.Type, &c.CreatedAt); err != nil {
 		return nil, fmt.Errorf("AdminChatRepo.GetByID: %w", err)
 	}
 	c.ParentID = parentID
+	if extRoomID != nil {
+		c.ExternalRoomID = *extRoomID
+	}
 	return c, nil
 }
 
@@ -46,10 +50,14 @@ func (r *ChatRepo) GetParentByEventID(ctx context.Context, eventID uuid.UUID) (*
 
 	c := &domain.Chat{}
 	var parentID *uuid.UUID
-	if err := row.Scan(&c.ID, &c.EventID, &parentID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+	var extRoomID *string
+	if err := row.Scan(&c.ID, &c.EventID, &parentID, &extRoomID, &c.Type, &c.CreatedAt); err != nil {
 		return nil, fmt.Errorf("AdminChatRepo.GetParentByEventID: %w", err)
 	}
 	c.ParentID = parentID
+	if extRoomID != nil {
+		c.ExternalRoomID = *extRoomID
+	}
 	return c, nil
 }
 
@@ -73,10 +81,14 @@ func (r *ChatRepo) ListByEventID(ctx context.Context, eventID uuid.UUID) ([]*dom
 	for rows.Next() {
 		c := &domain.Chat{}
 		var parentID *uuid.UUID
-		if err := rows.Scan(&c.ID, &c.EventID, &parentID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+		var extRoomID *string
+		if err := rows.Scan(&c.ID, &c.EventID, &parentID, &extRoomID, &c.Type, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("AdminChatRepo.ListByEventID scan: %w", err)
 		}
 		c.ParentID = parentID
+		if extRoomID != nil {
+			c.ExternalRoomID = *extRoomID
+		}
 		chats = append(chats, c)
 	}
 	slog.Debug("[AdminChatRepo.ListByEventID] fetched", "count", len(chats))

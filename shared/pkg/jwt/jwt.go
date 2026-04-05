@@ -14,6 +14,7 @@ type Claims struct {
 	UserID     uuid.UUID `json:"user_id"`
 	ExternalID string    `json:"external_id"`
 	EventID    uuid.UUID `json:"event_id"`
+	Name       string    `json:"name"`
 	Role       string    `json:"role"`
 	ExpiresAt  time.Time `json:"expires_at"`
 }
@@ -22,6 +23,7 @@ type rawClaims struct {
 	UserID     string `json:"user_id"`
 	ExternalID string `json:"external_id"`
 	EventID    string `json:"event_id"`
+	Name       string `json:"name"`
 	Role       string `json:"role"`
 	jwt.RegisteredClaims
 }
@@ -61,6 +63,7 @@ func ValidateToken(tokenStr, secret string) (*Claims, error) {
 		UserID:     userID,
 		ExternalID: raw.ExternalID,
 		EventID:    eventID,
+		Name:       raw.Name,
 		Role:       raw.Role,
 		ExpiresAt:  exp,
 	}
@@ -74,6 +77,7 @@ func CreateToken(c *Claims, secret string, ttl time.Duration) (string, error) {
 		UserID:     c.UserID.String(),
 		ExternalID: c.ExternalID,
 		EventID:    c.EventID.String(),
+		Name:       c.Name,
 		Role:       c.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <script src="http://localhost/widget/widget.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f0f0f0; padding: 20px; }
+    h2 { font-size: 0.9rem; color: #555; margin-bottom: 8px; }
+    .users { display: flex; gap: 20px; }
+    .user-col { flex: 1; }
+    .connect-form { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+    .connect-form label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 3px; margin-top: 8px; }
+    .connect-form label:first-of-type { margin-top: 0; }
+    .connect-form input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; }
+    .connect-form button { margin-top: 10px; width: 100%; padding: 7px; background: #4f46e5; color: #fff;
+             border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .connect-form button:hover { background: #4338ca; }
+    .chat-box { height: 500px; }
+    .status { font-size: 0.75rem; margin-top: 6px; padding: 5px 8px; border-radius: 4px; display: none; }
+    .status.ok  { background: #dcfce7; color: #166534; display: block; }
+    .status.err { background: #fee2e2; color: #991b1b; display: block; }
+  </style>
+</head>
+<body>
+
+<div class="users">
+
+  <!-- Пользователь 1 -->
+  <div class="user-col">
+    <div class="connect-form">
+      <h2>Пользователь 1</h2>
+      <label>API Secret</label>
+      <input id="secret1" type="text" value="my-test-api-secret" />
+      <label>Имя</label>
+      <input id="name1" type="text" />
+      <label>External ID</label>
+      <input id="extid1" type="text" />
+      <button onclick="connect(1)">Подключиться</button>
+      <div id="status1" class="status"></div>
+    </div>
+    <div id="chat1" class="chat-box"></div>
+  </div>
+
+  <!-- Пользователь 2 -->
+  <div class="user-col">
+    <div class="connect-form">
+      <h2>Пользователь 2</h2>
+      <label>API Secret</label>
+      <input id="secret2" type="text" value="my-test-api-secret" />
+      <label>Имя</label>
+      <input id="name2" type="text" />
+      <label>External ID</label>
+      <input id="extid2" type="text" />
+      <button onclick="connect(2)">Подключиться</button>
+      <div id="status2" class="status"></div>
+    </div>
+    <div id="chat2" class="chat-box"></div>
+  </div>
+
+</div>
+
+<script>
+  const EVENT_ID = '190ead38-ef83-4235-bc84-5fcb15ffd252';
+  const ROOM_ID  = 'Состояние дел и планы';
+
+  const NAMES = ['Алексей','Мария','Иван','Анна','Дмитрий','Елена','Сергей','Ольга','Андрей','Татьяна'];
+
+  function randomName() {
+    return NAMES[Math.floor(Math.random() * NAMES.length)];
+  }
+
+  function randomExtId() {
+    return 'user-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  // Fill on page load
+  window.addEventListener('DOMContentLoaded', () => {
+    for (let n = 1; n <= 2; n++) {
+      document.getElementById('name'  + n).value  = randomName();
+      document.getElementById('extid' + n).value = randomExtId();
+    }
+  });
+
+  async function connect(n) {
+    const secret   = document.getElementById('secret' + n).value.trim();
+    const name     = document.getElementById('name' + n).value.trim();
+    const externalId = document.getElementById('extid' + n).value.trim();
+    const statusEl = document.getElementById('status' + n);
+
+    statusEl.className = 'status ok';
+    statusEl.textContent = 'Получаем токен...';
+
+    try {
+      const res = await fetch('/api/auth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${secret}`,
+        },
+        body: JSON.stringify({
+          external_user_id: externalId,
+          event_id: EVENT_ID,
+          name: name,
+          role: 'user',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const { token } = await res.json();
+
+      window.ChatSem.init({
+        containerId: 'chat' + n,
+        eventId: EVENT_ID,
+        token: token,
+        roomId: ROOM_ID,
+      });
+
+      statusEl.textContent = `✓ Подключён как ${name}`;
+    } catch (e) {
+      statusEl.className = 'status err';
+      statusEl.textContent = `Ошибка: ${e.message}`;
+    }
+  }
+</script>
+
+</body>
+</html>

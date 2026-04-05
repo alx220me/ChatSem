@@ -11,6 +11,7 @@ type Message struct {
 	ID        uuid.UUID  `json:"id"`
 	ChatID    uuid.UUID  `json:"chatId"`
 	UserID    uuid.UUID  `json:"userId"`
+	UserName  string     `json:"userName,omitempty"`
 	Text      string     `json:"text"`
 	Seq       int64      `json:"seq"`
 	CreatedAt time.Time  `json:"createdAt"`

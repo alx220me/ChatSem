@@ -32,8 +32,7 @@ docker-build:
 	docker compose -f deploy/docker-compose.yml build
 
 docker-up:
-	cp -n deploy/.env.example deploy/.env || true
-	docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+	docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --force-recreate
 
 docker-down:
 	docker compose -f deploy/docker-compose.yml down

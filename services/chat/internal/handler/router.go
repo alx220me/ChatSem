@@ -37,7 +37,7 @@ func NewRouter(
 
 	chatH := NewChatHandler(chatSvc)
 	msgH := NewMessageHandler(msgSvc)
-	pollH := NewPollHandler(broker, msgRepo)
+	pollH := NewPollHandler(broker, msgRepo, rdb)
 
 	// Public endpoint — no auth required.
 	r.Get("/api/chat/events/{eventID}/chats", chatH.ListChats)
@@ -67,6 +67,12 @@ func NewRouter(
 			r.Use(middleware.PollIPRateLimit(rdb))
 			r.Get("/api/chat/{chatID}/poll", pollH.Poll)
 		})
+
+		// Online presence
+		onlineH := NewOnlineHandler(rdb)
+		r.Post("/api/chat/{chatID}/heartbeat", onlineH.Heartbeat)
+		r.Delete("/api/chat/{chatID}/heartbeat", onlineH.Leave)
+		r.Get("/api/chat/{chatID}/online", onlineH.OnlineCount)
 	})
 
 	return r

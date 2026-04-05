@@ -53,7 +53,7 @@ func (s *AuthService) ExchangeToken(ctx context.Context, req TokenRequest) (stri
 		"role", req.Role,
 	)
 
-	if req.Role != string(domain.RoleUser) && req.Role != string(domain.RoleModerator) {
+	if req.Role != string(domain.RoleUser) && req.Role != string(domain.RoleModerator) && req.Role != string(domain.RoleAdmin) {
 		return "", domain.ErrInvalidRole
 	}
 
@@ -81,6 +81,7 @@ func (s *AuthService) ExchangeToken(ctx context.Context, req TokenRequest) (stri
 		UserID:     user.ID,
 		ExternalID: user.ExternalID,
 		EventID:    user.EventID,
+		Name:       user.Name,
 		Role:       string(user.Role),
 	}, s.jwtSecret, s.jwtTTL)
 	if err != nil {

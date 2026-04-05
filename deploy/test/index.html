@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChatSem — Тестовая страница</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 1.4rem; margin-bottom: 24px; color: #111; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 1rem; margin-bottom: 16px; color: #555; display: flex; align-items: center; gap: 8px; }
+    .step-num { background: #4f46e5; color: #fff; border-radius: 50%; width: 22px; height: 22px;
+                display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; }
+    label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 4px; margin-top: 12px; }
+    label:first-of-type { margin-top: 0; }
+    input { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
+    input:focus { outline: none; border-color: #4f46e5; }
+    .row { display: flex; gap: 12px; }
+    .row input { flex: 1; }
+    button { margin-top: 14px; padding: 9px 18px; background: #4f46e5; color: #fff; border: none;
+             border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    button:hover { background: #4338ca; }
+    button:disabled { background: #a5b4fc; cursor: not-allowed; }
+    .status { margin-top: 10px; font-size: 0.82rem; padding: 8px 10px; border-radius: 6px; display: none; }
+    .status.ok  { background: #dcfce7; color: #166534; display: block; }
+    .status.err { background: #fee2e2; color: #991b1b; display: block; }
+    .status.info { background: #eff6ff; color: #1d4ed8; display: block; }
+    #chat-container { min-height: 420px; }
+    .hint { font-size: 0.8rem; color: #888; margin-top: 8px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>ChatSem — Тестовая страница</h1>
+
+  <!-- Шаг 1: Создание ивента -->
+  <div class="card">
+    <h2><span class="step-num">1</span> Создать ивент (через Admin API)</h2>
+
+    <label>JWT Secret (из <code>deploy/.env</code>)</label>
+    <input id="jwt-secret" type="text" value="change-me-in-production" placeholder="JWT_SECRET" />
+
+    <div class="row">
+      <div style="flex:1">
+        <label>Название ивента</label>
+        <input id="event-name" type="text" value="Тестовый ивент" />
+      </div>
+      <div style="flex:1">
+        <label>API Secret (придумай любой)</label>
+        <input id="api-secret" type="text" value="my-test-api-secret" />
+      </div>
+    </div>
+
+    <button id="btn-create-event" onclick="createChatEvent()">Создать ивент</button>
+    <div class="hint">Создаёт ивент и родительский чат через <code>POST /api/admin/events</code></div>
+    <div id="status-event" class="status"></div>
+  </div>
+
+  <!-- Шаг 1б: Использовать существующий ивент -->
+  <div class="card">
+    <h2><span class="step-num">1б</span> Или подключиться к существующему ивенту</h2>
+    <div class="row">
+      <div style="flex:2">
+        <label>Event ID</label>
+        <input id="existing-event-id" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+      </div>
+      <div style="flex:1">
+        <label>API Secret</label>
+        <input id="existing-api-secret" type="text" placeholder="my-test-api-secret" />
+      </div>
+    </div>
+    <button onclick="useExistingEvent()">Использовать этот ивент</button>
+    <div id="status-existing" class="status"></div>
+  </div>
+
+  <!-- Шаг 2: Подключиться как пользователь -->
+  <div class="card">
+    <h2><span class="step-num">2</span> Подключиться как пользователь</h2>
+
+    <div class="row">
+      <div style="flex:1">
+        <label>Ваше имя в чате</label>
+        <input id="user-name" type="text" value="Тестовый пользователь" />
+      </div>
+      <div style="flex:1">
+        <label>ID пользователя (внешний)</label>
+        <input id="user-external-id" type="text" value="user-001" />
+      </div>
+    </div>
+
+    <button id="btn-connect" onclick="connectUser()" disabled>Подключиться</button>
+    <div class="hint">Вызывает <code>POST /api/auth/token</code> и монтирует виджет</div>
+    <div id="status-connect" class="status"></div>
+  </div>
+
+  <!-- Шаг 3: Виджет -->
+  <div class="card">
+    <h2><span class="step-num">3</span> Чат</h2>
+    <div id="chat-container"></div>
+  </div>
+</div>
+
+<script src="/widget/widget.js"></script>
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let eventId = null;
+  let apiSecret = null;
+
+  function setStatus(id, type, msg) {
+    const el = document.getElementById(id);
+    el.className = 'status ' + type;
+    el.textContent = msg;
+  }
+
+  // ── Client-side JWT signing (HS256, Web Crypto API) ────────────────────────
+  async function signAdminJWT(jwtSecret) {
+    const enc = new TextEncoder();
+
+    const toB64Url = bytes =>
+      btoa(String.fromCharCode(...new Uint8Array(bytes)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    const now = Math.floor(Date.now() / 1000);
+    const header  = toB64Url(enc.encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
+    const payload = toB64Url(enc.encode(JSON.stringify({
+      user_id:     '00000000-0000-0000-0000-000000000001',
+      external_id: 'admin',
+      event_id:    '00000000-0000-0000-0000-000000000000',
+      role:        'admin',
+      iat:         now,
+      exp:         now + 3600,
+    })));
+
+    const input = `${header}.${payload}`;
+    const key = await crypto.subtle.importKey(
+      'raw', enc.encode(jwtSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(input));
+    return `${input}.${toB64Url(sig)}`;
+  }
+
+  // ── Step 1б: Use existing event ───────────────────────────────────────────
+  function useExistingEvent() {
+    const id = document.getElementById('existing-event-id').value.trim();
+    const secret = document.getElementById('existing-api-secret').value.trim();
+    if (!id || !secret) {
+      setStatus('status-existing', 'err', 'Заполни Event ID и API Secret.');
+      return;
+    }
+    eventId = id;
+    apiSecret = secret;
+    setStatus('status-existing', 'ok', `✓ Используем ивент: ${eventId}`);
+    document.getElementById('btn-connect').disabled = false;
+  }
+
+  // ── Step 1: Create event ───────────────────────────────────────────────────
+  async function createChatEvent() {
+    const jwtSecret = document.getElementById('jwt-secret').value.trim();
+    const eventName = document.getElementById('event-name').value.trim();
+    apiSecret       = document.getElementById('api-secret').value.trim();
+
+    if (!jwtSecret || !eventName || !apiSecret) {
+      setStatus('status-event', 'err', 'Заполни все поля.');
+      return;
+    }
+
+    const btn = document.getElementById('btn-create-event');
+    btn.disabled = true;
+    setStatus('status-event', 'info', 'Создаём ивент...');
+
+    try {
+      const adminToken = await signAdminJWT(jwtSecret);
+
+      const res = await fetch('/api/admin/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          name:           eventName,
+          allowed_origin: 'http://localhost',
+          api_secret:     apiSecret,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const event = await res.json();
+      eventId = event.id;
+
+      setStatus('status-event', 'ok', `✓ Ивент создан. event_id: ${eventId}`);
+      document.getElementById('btn-connect').disabled = false;
+    } catch (e) {
+      setStatus('status-event', 'err', `Ошибка: ${e.message}`);
+      btn.disabled = false;
+    }
+  }
+
+  // ── Step 2: Connect as user ────────────────────────────────────────────────
+  async function connectUser() {
+    const name       = document.getElementById('user-name').value.trim();
+    const externalId = document.getElementById('user-external-id').value.trim();
+
+    if (!name || !externalId) {
+      setStatus('status-connect', 'err', 'Заполни имя и ID пользователя.');
+      return;
+    }
+
+    setStatus('status-connect', 'info', 'Получаем токен...');
+    document.getElementById('btn-connect').disabled = true;
+
+    try {
+      const res = await fetch('/api/auth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${apiSecret}`,
+        },
+        body: JSON.stringify({
+          external_user_id: externalId,
+          event_id:         eventId,
+          name:             name,
+          role:             'user',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const { token } = await res.json();
+      setStatus('status-connect', 'ok', `✓ Токен получен. Монтируем виджет...`);
+
+      // Mount widget
+      window.ChatSem.init({
+        containerId: 'chat-container',
+        eventId:     eventId,
+        token:       token,
+      });
+
+      setStatus('status-connect', 'ok', `✓ Виджет смонтирован! Можно отправлять сообщения.`);
+    } catch (e) {
+      setStatus('status-connect', 'err', `Ошибка: ${e.message}`);
+      document.getElementById('btn-connect').disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

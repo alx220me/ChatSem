@@ -1,7 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { ChatWindow } from './components/ChatWindow'
 import { ApiClient } from './api/client'
-import { initToken, getToken } from './hooks/useAuth'
 import type { WidgetConfig } from './types'
 
 declare global {
@@ -20,16 +19,17 @@ window.ChatSem = {
       return
     }
 
-    // Initialise module-level token storage
-    initToken(config.token)
+    // Per-instance token closure — supports multiple widgets on the same page
+    let instanceToken = config.token
+    const getInstanceToken = () => instanceToken
 
     const api = new ApiClient(
       '/api',
-      getToken,
+      getInstanceToken,
       config.onTokenExpired
         ? async () => {
             const newToken = await config.onTokenExpired!()
-            initToken(newToken)
+            instanceToken = newToken
             return newToken
           }
         : undefined,

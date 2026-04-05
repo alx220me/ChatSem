@@ -1,4 +1,4 @@
 # Replace md5<hash> with the actual md5 hash of your PostgreSQL password.
 # Generate with: echo -n "passwordchatsem" | md5sum  (password + username, no separator)
 # Format: "username" "md5<hash>"
-"chatsem" "md5REPLACEME"
+"chatsem" "a2e730ae4d0d7136ca251c12745316e3"

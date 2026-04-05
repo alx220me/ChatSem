@@ -30,10 +30,14 @@ func (r *ChatRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Chat, err
 
 	c := &domain.Chat{}
 	var parentID *uuid.UUID
-	if err := row.Scan(&c.ID, &c.EventID, &parentID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+	var externalRoomID *string
+	if err := row.Scan(&c.ID, &c.EventID, &parentID, &externalRoomID, &c.Type, &c.CreatedAt); err != nil {
 		return nil, fmt.Errorf("ChatRepo.GetByID: %w", err)
 	}
 	c.ParentID = parentID
+	if externalRoomID != nil {
+		c.ExternalRoomID = *externalRoomID
+	}
 	slog.Debug("[ChatRepo.GetByID] found", "chat_id", id, "type", c.Type)
 	return c, nil
 }
@@ -47,10 +51,14 @@ func (r *ChatRepo) GetParentByEventID(ctx context.Context, eventID uuid.UUID) (*
 
 	c := &domain.Chat{}
 	var parentID *uuid.UUID
-	if err := row.Scan(&c.ID, &c.EventID, &parentID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+	var externalRoomID *string
+	if err := row.Scan(&c.ID, &c.EventID, &parentID, &externalRoomID, &c.Type, &c.CreatedAt); err != nil {
 		return nil, fmt.Errorf("ChatRepo.GetParentByEventID: %w", err)
 	}
 	c.ParentID = parentID
+	if externalRoomID != nil {
+		c.ExternalRoomID = *externalRoomID
+	}
 	slog.Debug("[ChatRepo.GetParentByEventID] found", "chat_id", c.ID, "event_id", eventID)
 	return c, nil
 }
@@ -62,7 +70,7 @@ func (r *ChatRepo) GetOrCreateChild(ctx context.Context, eventID uuid.UUID, exte
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO chats (event_id, parent_id, external_room_id, type)
 		VALUES ($1, $2, $3, 'child')
-		ON CONFLICT (event_id, external_room_id) DO NOTHING`,
+		ON CONFLICT (event_id, external_room_id) WHERE type = 'child' DO NOTHING`,
 		eventID, parentID, externalRoomID)
 	if err != nil {
 		return nil, fmt.Errorf("ChatRepo.GetOrCreateChild insert: %w", err)
@@ -75,10 +83,14 @@ func (r *ChatRepo) GetOrCreateChild(ctx context.Context, eventID uuid.UUID, exte
 
 	c := &domain.Chat{}
 	var pID *uuid.UUID
-	if err := row.Scan(&c.ID, &c.EventID, &pID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+	var extRoomID *string
+	if err := row.Scan(&c.ID, &c.EventID, &pID, &extRoomID, &c.Type, &c.CreatedAt); err != nil {
 		return nil, fmt.Errorf("ChatRepo.GetOrCreateChild select: %w", err)
 	}
 	c.ParentID = pID
+	if extRoomID != nil {
+		c.ExternalRoomID = *extRoomID
+	}
 	slog.Debug("[ChatRepo.GetOrCreateChild] done", "chat_id", c.ID, "room_id", externalRoomID)
 	return c, nil
 }
@@ -98,10 +110,14 @@ func (r *ChatRepo) ListByEventID(ctx context.Context, eventID uuid.UUID) ([]*dom
 	for rows.Next() {
 		c := &domain.Chat{}
 		var parentID *uuid.UUID
-		if err := rows.Scan(&c.ID, &c.EventID, &parentID, &c.ExternalRoomID, &c.Type, &c.CreatedAt); err != nil {
+		var extRoomID *string
+		if err := rows.Scan(&c.ID, &c.EventID, &parentID, &extRoomID, &c.Type, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("ChatRepo.ListByEventID scan: %w", err)
 		}
 		c.ParentID = parentID
+		if extRoomID != nil {
+			c.ExternalRoomID = *extRoomID
+		}
 		chats = append(chats, c)
 	}
 	slog.Debug("[ChatRepo.ListByEventID] fetched", "event_id", eventID, "count", len(chats))
