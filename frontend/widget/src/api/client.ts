@@ -1,5 +1,17 @@
 import type { Chat, Message, SendResponse, PollResponse } from '../types'
 
+export class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    /** Seconds to wait before retrying (from Retry-After header). */
+    public readonly retryAfter: number = 0,
+  ) {
+    super(message)
+    this.name = 'HttpError'
+  }
+}
+
 export class ApiClient {
   private baseUrl: string
   private getToken: () => string
@@ -55,7 +67,8 @@ export class ApiClient {
     }
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      const retryAfter = parseInt(res.headers.get('Retry-After') ?? '0', 10) || 0
+      throw new HttpError(res.status, `HTTP ${res.status}: ${res.statusText}`, retryAfter)
     }
 
     // 204 No Content — return empty object cast to T
@@ -67,27 +80,95 @@ export class ApiClient {
   }
 
   async listChats(eventId: string): Promise<Chat[]> {
-    return this.request<Chat[]>('GET', `/chat/events/${eventId}/chats`)
+    const res = await this.request<{ parent: Chat; children: Chat[] }>(
+      'GET',
+      `/chat/events/${eventId}/chats`,
+    )
+    return [res.parent, ...(res.children ?? [])]
   }
 
   async joinRoom(eventId: string, roomId: string): Promise<void> {
-    await this.request<unknown>('POST', `/chat/join`, { eventId, roomId })
+    await this.request<unknown>('POST', `/chat/join`, { event_id: eventId, room_id: roomId })
   }
 
   async getMessages(chatId: string, limit: number): Promise<Message[]> {
-    return this.request<Message[]>('GET', `/chat/chats/${chatId}/messages?limit=${limit}`)
+    const res = await this.request<{ messages: Message[] }>(
+      'GET',
+      `/chat/${chatId}/messages?limit=${limit}`,
+    )
+    return res.messages ?? []
   }
 
   async sendMessage(chatId: string, text: string): Promise<SendResponse> {
     return this.request<SendResponse>('POST', `/chat/${chatId}/messages`, { text })
   }
 
-  async poll(chatId: string, afterSeq: number, signal: AbortSignal): Promise<PollResponse> {
+  async poll(chatId: string, afterSeq: number, afterDeleteSeq: number, signal: AbortSignal): Promise<PollResponse> {
     return this.request<PollResponse>(
       'GET',
-      `/chat/${chatId}/poll?after=${afterSeq}`,
+      `/chat/${chatId}/poll?after=${afterSeq}&after_delete_seq=${afterDeleteSeq}`,
       undefined,
       signal,
     )
+  }
+
+  /** Decode JWT payload (no signature verification — server already did that). */
+  private decodeJwtPayload(): Record<string, unknown> {
+    try {
+      const parts = this.getToken().split('.')
+      if (parts.length !== 3) return {}
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+      const binary = atob(base64)
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+      return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }
+
+  getCurrentUserName(): string {
+    return (this.decodeJwtPayload().name as string) || ''
+  }
+
+  getCurrentUserId(): string {
+    return (this.decodeJwtPayload().user_id as string) || ''
+  }
+
+  getCurrentUserRole(): string {
+    return (this.decodeJwtPayload().role as string) || ''
+  }
+
+  async deleteMessage(msgId: string): Promise<void> {
+    await this.request<unknown>('DELETE', `/chat/messages/${msgId}`)
+  }
+
+  async banUser(userId: string, eventId: string, reason: string): Promise<void> {
+    await this.request<unknown>('POST', `/admin/bans`, { user_id: userId, event_id: eventId, reason })
+  }
+
+  async muteUser(userId: string, chatId: string, reason: string): Promise<void> {
+    await this.request<unknown>('POST', `/admin/mutes`, { user_id: userId, chat_id: chatId, reason })
+  }
+
+  async heartbeat(chatId: string): Promise<void> {
+    await this.request<unknown>('POST', `/chat/${chatId}/heartbeat`)
+  }
+
+  async leave(chatId: string): Promise<void> {
+    await this.request<unknown>('DELETE', `/chat/${chatId}/heartbeat`)
+  }
+
+  /** Fire-and-forget leave with keepalive=true — survives page close. */
+  leaveBeacon(chatId: string): void {
+    fetch(`${this.baseUrl}/chat/${chatId}/heartbeat`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${this.getToken()}` },
+      keepalive: true,
+    }).catch(() => {})
+  }
+
+  async getOnlineCount(chatId: string): Promise<number> {
+    const res = await this.request<{ count: number }>('GET', `/chat/${chatId}/online`)
+    return res.count ?? 0
   }
 }
