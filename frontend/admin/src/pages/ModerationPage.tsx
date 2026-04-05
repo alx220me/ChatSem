@@ -27,7 +27,7 @@ function BansTab({ eventId }: { eventId: string }): React.ReactElement {
     setLoading(true)
     try {
       const data = await api.listBans(eventId)
-      setBans(data)
+      setBans(data ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load bans')
     } finally {
@@ -185,7 +185,7 @@ function MutesTab({ eventId }: { eventId: string }): React.ReactElement {
       setError(null)
       try {
         const data = await api.listMutes(chatId)
-        setMutes(data)
+        setMutes(data ?? [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load mutes')
       } finally {

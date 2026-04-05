@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const [state, setState] = useState<AuthState>(loadSession)
 
   const getToken = useCallback(() => state.token ?? '', [state.token])
-  const api = state.token ? new AdminApiClient('/api', getToken) : null
+  const api = state.token ? new AdminApiClient('', getToken) : null
 
   const login = useCallback(async (eventId: string, apiSecret: string, name: string) => {
     if (import.meta.env.DEV) {
@@ -43,8 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
     const res = await fetch('/api/auth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventId, apiSecret, name, role: 'admin' }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiSecret}`,
+      },
+      body: JSON.stringify({
+        external_user_id: `admin-${name}`,
+        event_id: eventId,
+        name,
+        role: 'admin',
+      }),
     })
 
     if (!res.ok) {

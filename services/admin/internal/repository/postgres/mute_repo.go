@@ -61,7 +61,7 @@ func (r *MuteRepo) ListByChatID(ctx context.Context, chatID uuid.UUID) ([]*domai
 	}
 	defer rows.Close()
 
-	var mutes []*domain.Mute
+	mutes := make([]*domain.Mute, 0)
 	for rows.Next() {
 		m := &domain.Mute{}
 		if err := rows.Scan(&m.ID, &m.ChatID, &m.UserID, &m.MutedBy, &m.Reason, &m.CreatedAt, &m.ExpiresAt); err != nil {

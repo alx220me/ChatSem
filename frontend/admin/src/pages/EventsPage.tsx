@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import type { Event } from '../types'
 
@@ -141,6 +142,7 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
 
 export function EventsPage(): React.ReactElement {
   const { api } = useAuth()
+  const navigate = useNavigate()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -187,14 +189,30 @@ export function EventsPage(): React.ReactElement {
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>
               <th style={thStyle}>Name</th>
+              <th style={thStyle}>ID</th>
               <th style={thStyle}>Allowed Origin</th>
               <th style={thStyle}>Created At</th>
             </tr>
           </thead>
           <tbody>
             {events.map((ev) => (
-              <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+              <tr
+                key={ev.id}
+                onClick={() => navigate(`/events/${ev.id}/chats`)}
+                style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
+              >
                 <td style={tdStyle}>{ev.name}</td>
+                <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>
+                  <span
+                    title="Click to copy"
+                    onClick={(e) => { e.stopPropagation(); void navigator.clipboard.writeText(ev.id) }}
+                    style={{ cursor: 'copy' }}
+                  >
+                    {ev.id}
+                  </span>
+                </td>
                 <td style={tdStyle}>{ev.allowedOrigin}</td>
                 <td style={tdStyle}>{new Date(ev.createdAt).toLocaleString()}</td>
               </tr>

@@ -59,7 +59,7 @@ func (r *BanRepo) ListByEventID(ctx context.Context, eventID uuid.UUID) ([]*doma
 	}
 	defer rows.Close()
 
-	var bans []*domain.Ban
+	bans := make([]*domain.Ban, 0)
 	for rows.Next() {
 		b := &domain.Ban{}
 		if err := rows.Scan(&b.ID, &b.UserID, &b.EventID, &b.ChatID, &b.BannedBy, &b.Reason, &b.CreatedAt, &b.ExpiresAt); err != nil {
