@@ -10,6 +10,7 @@ export interface Message {
   id: string
   chatId: string
   userId: string
+  userName?: string
   text: string
   seq: number
   createdAt: string
@@ -23,6 +24,8 @@ export interface SendResponse {
 
 export interface PollResponse {
   messages: Message[]
+  deleted_ids?: string[]
+  last_delete_seq?: number
 }
 
 export interface WidgetConfig {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"chatsem/shared/domain"
 	"chatsem/shared/pkg/longpoll"
@@ -74,6 +75,14 @@ func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventI
 	}
 	slog.Info("[MessageService.SendMessage] sent", "chat_id", chatID, "seq", msg.Seq, "id", msg.ID)
 
+	// Update last_seq in Redis — used by PollHandler fast-path to detect missed messages.
+	if s.rdb != nil {
+		seqKey := fmt.Sprintf("chat:%s:last_seq", chatID)
+		if setErr := s.rdb.Set(ctx, seqKey, msg.Seq, 7*24*time.Hour).Err(); setErr != nil {
+			slog.Warn("[MessageService.SendMessage] redis last_seq update failed", "err", setErr)
+		}
+	}
+
 	// Publish to broker — fail safe: message is already persisted.
 	payload, _ := json.Marshal(msg)
 	if publishErr := s.broker.Publish(ctx, chatID, payload); publishErr != nil {
@@ -116,5 +125,29 @@ func (s *MessageService) SoftDelete(ctx context.Context, msgID, requestorID uuid
 		return fmt.Errorf("MessageService.SoftDelete: %w", err)
 	}
 	slog.Info("[MessageService.SoftDelete] deleted", "msg_id", msgID, "by", requestorID)
+
+	// Append deletion to a sorted set (score = delete_seq) so polls can cursor through deletions.
+	if s.rdb != nil {
+		counterKey := fmt.Sprintf("chat:%s:delete_seq", msg.ChatID)
+		logKey := fmt.Sprintf("chat:%s:delete_log", msg.ChatID)
+
+		deleteSeq, incrErr := s.rdb.Incr(ctx, counterKey).Result()
+		if incrErr == nil {
+			pipe := s.rdb.Pipeline()
+			pipe.ZAdd(ctx, logKey, redis.Z{Score: float64(deleteSeq), Member: msgID.String()})
+			pipe.Expire(ctx, counterKey, time.Hour)
+			pipe.Expire(ctx, logKey, time.Hour)
+			if _, pipeErr := pipe.Exec(ctx); pipeErr != nil {
+				slog.Warn("[MessageService.SoftDelete] redis delete_log update failed", "err", pipeErr)
+			}
+		} else {
+			slog.Warn("[MessageService.SoftDelete] redis delete_seq incr failed", "err", incrErr)
+		}
+	}
+
+	if publishErr := s.broker.Publish(ctx, msg.ChatID, []byte(`{"type":"delete"}`)); publishErr != nil {
+		slog.Warn("[MessageService.SoftDelete] broker publish failed", "err", publishErr)
+	}
+
 	return nil
 }
