@@ -54,12 +54,14 @@ func main() {
 	banRepo := postgres.NewBanRepo(pool)
 	muteRepo := postgres.NewMuteRepo(pool)
 	userRepo := postgres.NewUserRepo(pool)
+	msgRepo := postgres.NewMessageRepo(pool)
 	eventSvc := service.NewEventService(eventRepo, chatRepo)
 	banSvc := service.NewBanService(banRepo, rdb)
 	muteSvc := service.NewMuteService(muteRepo)
 	userSvc := service.NewUserService(userRepo)
+	exportSvc := service.NewExportService(msgRepo)
 
-	r := handler.NewRouter(cfg.JWTSecret, eventSvc, banSvc, muteSvc, userSvc)
+	r := handler.NewRouter(cfg.JWTSecret, eventSvc, banSvc, muteSvc, userSvc, exportSvc)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,
