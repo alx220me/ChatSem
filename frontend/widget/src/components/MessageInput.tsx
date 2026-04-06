@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { EmojiPicker } from './EmojiPicker'
 
 interface MessageInputProps {
   onSend: (text: string) => void
@@ -8,6 +9,7 @@ interface MessageInputProps {
 export function MessageInput({ onSend, disabled }: MessageInputProps): React.ReactElement {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   async function handleSend() {
@@ -29,6 +31,38 @@ export function MessageInput({ onSend, disabled }: MessageInputProps): React.Rea
       e.preventDefault()
       void handleSend()
     }
+  }
+
+  function handleEmojiSelect(emoji: string) {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      setText((prev) => prev + emoji)
+      return
+    }
+
+    const start = textarea.selectionStart ?? text.length
+    const end = textarea.selectionEnd ?? text.length
+    const newText = text.slice(0, start) + emoji + text.slice(end)
+    setText(newText)
+
+    // Restore cursor position after the inserted emoji
+    requestAnimationFrame(() => {
+      textarea.focus()
+      const newPos = start + emoji.length
+      textarea.setSelectionRange(newPos, newPos)
+    })
+  }
+
+  function toggleEmojiPicker() {
+    setEmojiPickerOpen((prev) => {
+      console.debug('[MessageInput] emoji picker open/close:', !prev)
+      return !prev
+    })
+  }
+
+  function closeEmojiPicker() {
+    console.debug('[MessageInput] emoji picker open/close:', false)
+    setEmojiPickerOpen(false)
   }
 
   const isDisabled = disabled || sending
@@ -66,6 +100,30 @@ export function MessageInput({ onSend, disabled }: MessageInputProps): React.Rea
           opacity: isDisabled ? 0.6 : 1,
         }}
       />
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <button
+          onClick={toggleEmojiPicker}
+          onMouseDown={(e) => e.stopPropagation()}
+          disabled={isDisabled}
+          title="Смайлики"
+          style={{
+            padding: '8px 10px',
+            borderRadius: 8,
+            border: '1px solid #d0d0d0',
+            backgroundColor: emojiPickerOpen ? '#f0f0f0' : '#fff',
+            cursor: isDisabled ? 'not-allowed' : 'pointer',
+            fontSize: 18,
+            height: 38,
+            opacity: isDisabled ? 0.6 : 1,
+            lineHeight: 1,
+          }}
+        >
+          😊
+        </button>
+        {emojiPickerOpen && (
+          <EmojiPicker onSelect={handleEmojiSelect} onClose={closeEmojiPicker} />
+        )}
+      </div>
       <button
         onClick={() => void handleSend()}
         disabled={isDisabled || !text.trim()}

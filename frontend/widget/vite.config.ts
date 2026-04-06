@@ -1,10 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  define: {
-    'process.env.NODE_ENV': '"production"',
+  define: command === 'build' ? { 'process.env.NODE_ENV': '"production"' } : {},
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
   },
   build: {
     lib: {
@@ -18,4 +21,4 @@ export default defineConfig({
       external: [],
     },
   },
-})
+}))
