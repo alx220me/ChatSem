@@ -51,7 +51,7 @@ func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID,
 		"chat_id", chatID, "after_seq", afterSeq, "limit", limit)
 	rows, err := r.db.Query(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at,
-		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
 		FROM messages m
 		LEFT JOIN users u  ON u.id  = m.user_id
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
@@ -80,7 +80,7 @@ func (r *MessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit,
 		"chat_id", chatID, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at,
-		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
 		FROM messages m
 		LEFT JOIN users u  ON u.id  = m.user_id
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
@@ -167,7 +167,7 @@ func (r *MessageRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Messag
 	m := &domain.Message{}
 	err := r.db.QueryRow(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, m.text, m.seq, m.created_at, m.deleted_at,
-		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
 		FROM messages m
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
 		LEFT JOIN users ru    ON ru.id = rm.user_id

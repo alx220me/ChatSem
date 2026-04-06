@@ -29,7 +29,7 @@ func (r *MessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from
 	slog.Debug("[AdminMessageRepo.GetByChatRange] query", "chat_id", chatID, "from", from, "to", to, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, m.text, m.seq, m.created_at,
-		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
 		FROM messages m
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
 		LEFT JOIN users ru    ON ru.id = rm.user_id
