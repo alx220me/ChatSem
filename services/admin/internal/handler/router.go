@@ -14,6 +14,7 @@ import (
 // NewRouter creates the chi router for the admin service with standard middleware.
 func NewRouter(
 	jwtSecret string,
+	authH *AuthHandler,
 	eventSvc *service.EventService,
 	banSvc *service.BanService,
 	muteSvc *service.MuteService,
@@ -29,6 +30,9 @@ func NewRouter(
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		response.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "admin"})
 	})
+
+	// Public auth endpoint — no JWT required.
+	r.Post("/api/admin/auth/login", authH.Login)
 
 	eventH := NewEventHandler(eventSvc)
 	banH := NewBanHandler(banSvc)

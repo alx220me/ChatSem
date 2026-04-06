@@ -6,9 +6,8 @@ export function LoginPage(): React.ReactElement {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const [eventId, setEventId] = useState('')
-  const [apiSecret, setApiSecret] = useState('')
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -17,7 +16,7 @@ export function LoginPage(): React.ReactElement {
     setError(null)
     setLoading(true)
     try {
-      await login(eventId, apiSecret, name)
+      await login(username, password)
       navigate('/events')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed'
@@ -68,34 +67,22 @@ export function LoginPage(): React.ReactElement {
         )}
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
-          Event ID
+          Username
           <input
             type="text"
-            value={eventId}
-            onChange={(e) => setEventId(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
             style={inputStyle}
           />
         </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
-          API Secret
+          Password
           <input
             type="password"
-            value={apiSecret}
-            onChange={(e) => setApiSecret(e.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
-          Name
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
             style={inputStyle}
           />

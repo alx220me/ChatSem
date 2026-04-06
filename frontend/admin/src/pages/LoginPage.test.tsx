@@ -6,7 +6,7 @@ import { LoginPage } from './LoginPage'
 import { AuthContext } from '../context/AuthContext'
 
 // Helper: render LoginPage inside a minimal router + auth context
-function renderLogin(loginFn: () => Promise<void>) {
+function renderLogin(loginFn: (username: string, password: string) => Promise<void>) {
   return render(
     <AuthContext.Provider
       value={{
@@ -37,28 +37,26 @@ describe('LoginPage', () => {
     const login = vi.fn().mockResolvedValueOnce(undefined)
     renderLogin(login)
 
-    await userEvent.type(screen.getByLabelText(/event id/i), 'test-event-id')
-    await userEvent.type(screen.getByLabelText(/api secret/i), 'secret123')
-    await userEvent.type(screen.getByLabelText(/name/i), 'Admin')
+    await userEvent.type(screen.getByLabelText(/username/i), 'admin')
+    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
-    expect(login).toHaveBeenCalledWith('test-event-id', 'secret123', 'Admin')
+    expect(login).toHaveBeenCalledWith('admin', 'password123')
     await waitFor(() => {
       expect(screen.getByTestId('events-page')).toBeInTheDocument()
     })
   })
 
-  it('TestLogin_InvalidSecret: shows error on 401', async () => {
-    const login = vi.fn().mockRejectedValueOnce(new Error('Invalid secret'))
+  it('TestLogin_InvalidCredentials: shows error on 401', async () => {
+    const login = vi.fn().mockRejectedValueOnce(new Error('Invalid credentials'))
     renderLogin(login)
 
-    await userEvent.type(screen.getByLabelText(/event id/i), 'test-event-id')
-    await userEvent.type(screen.getByLabelText(/api secret/i), 'wrong')
-    await userEvent.type(screen.getByLabelText(/name/i), 'Admin')
+    await userEvent.type(screen.getByLabelText(/username/i), 'admin')
+    await userEvent.type(screen.getByLabelText(/password/i), 'wrong')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid secret')).toBeInTheDocument()
+      expect(screen.getByText('Invalid credentials')).toBeInTheDocument()
     })
   })
 })

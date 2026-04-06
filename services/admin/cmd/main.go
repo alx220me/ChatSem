@@ -11,10 +11,10 @@ import (
 
 	"chatsem/services/admin/internal/config"
 	"chatsem/services/admin/internal/handler"
-	"chatsem/services/admin/internal/repository/postgres"
+	adminpostgres "chatsem/services/admin/internal/repository/postgres"
 	"chatsem/services/admin/internal/service"
+	"chatsem/shared/pkg/postgres"
 
-	pgx "github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -32,13 +32,12 @@ func main() {
 	slog.Info("service starting", "service", "admin", "addr", cfg.Addr, "version", buildVersion, "built_at", buildTime)
 
 	// Database pool
-	pool, err := pgx.New(context.Background(), cfg.DatabaseURL)
+	pool, err := postgres.NewPool(context.Background(), cfg.DatabaseURL)
 	if err != nil {
 		slog.Error("database: connection failed", "err", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
-	slog.Debug("database: connected")
 
 	// Redis client for ban cache
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
@@ -49,19 +48,25 @@ func main() {
 	cancel2()
 
 	// Repositories and services
-	eventRepo := postgres.NewEventRepo(pool)
-	chatRepo := postgres.NewChatRepo(pool)
-	banRepo := postgres.NewBanRepo(pool)
-	muteRepo := postgres.NewMuteRepo(pool)
-	userRepo := postgres.NewUserRepo(pool)
-	msgRepo := postgres.NewMessageRepo(pool)
+	eventRepo := adminpostgres.NewEventRepo(pool)
+	chatRepo := adminpostgres.NewChatRepo(pool)
+	banRepo := adminpostgres.NewBanRepo(pool)
+	muteRepo := adminpostgres.NewMuteRepo(pool)
+	userRepo := adminpostgres.NewUserRepo(pool)
+	msgRepo := adminpostgres.NewMessageRepo(pool)
 	eventSvc := service.NewEventService(eventRepo, chatRepo)
 	banSvc := service.NewBanService(banRepo, rdb)
 	muteSvc := service.NewMuteService(muteRepo)
 	userSvc := service.NewUserService(userRepo)
 	exportSvc := service.NewExportService(msgRepo)
 
-	r := handler.NewRouter(cfg.JWTSecret, eventSvc, banSvc, muteSvc, userSvc, exportSvc)
+	authH, err := handler.NewAuthHandler(cfg.AdminUsername, cfg.AdminPassword, cfg.JWTSecret, cfg.JWTMaxTTL)
+	if err != nil {
+		slog.Error("auth handler: failed to initialize", "err", err)
+		os.Exit(1)
+	}
+
+	r := handler.NewRouter(cfg.JWTSecret, authH, eventSvc, banSvc, muteSvc, userSvc, exportSvc)
 
 	srv := &http.Server{
 		Addr:         cfg.Addr,
