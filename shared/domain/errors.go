@@ -13,4 +13,5 @@ var (
 	ErrMessageTooLong  = errors.New("message text exceeds 4096 characters")
 	ErrInvalidSecret   = errors.New("invalid api secret")
 	ErrInvalidRole     = errors.New("invalid role")
+	ErrInvalidReply    = errors.New("reply message does not belong to this chat")
 )

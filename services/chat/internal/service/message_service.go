@@ -39,8 +39,10 @@ func NewMessageService(
 }
 
 // SendMessage validates, checks ban/mute, inserts the message, and publishes to the broker.
-func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventID uuid.UUID, text string) (*domain.Message, error) {
-	slog.Debug("[MessageService.SendMessage] sending", "chat_id", chatID, "user_id", userID, "text_len", len(text))
+// replyToID is optional; when non-nil the message is stored as a reply to the referenced message.
+func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventID uuid.UUID, text string, replyToID *uuid.UUID) (*domain.Message, error) {
+	slog.Debug("[MessageService.SendMessage] sending",
+		"chat_id", chatID, "user_id", userID, "text_len", len(text), "reply_to_id", replyToID)
 
 	if len(text) == 0 {
 		return nil, domain.ErrEmptyMessage
@@ -70,7 +72,30 @@ func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventI
 		return nil, domain.ErrUserMuted
 	}
 
-	msg := &domain.Message{ChatID: chatID, UserID: userID, Text: text}
+	// Validate reply reference when provided.
+	var replyToSeq *int64
+	if replyToID != nil {
+		slog.Debug("[MessageService.SendMessage] validating reply", "reply_to_id", replyToID)
+		orig, err := s.messages.GetByID(ctx, *replyToID)
+		if err != nil {
+			slog.Warn("[MessageService.SendMessage] reply message not found", "reply_to_id", replyToID, "err", err)
+			return nil, domain.ErrNotFound
+		}
+		if orig.ChatID != chatID {
+			slog.Warn("[MessageService.SendMessage] reply cross-chat attempt",
+				"reply_to_id", replyToID, "orig_chat_id", orig.ChatID, "chat_id", chatID)
+			return nil, domain.ErrInvalidReply
+		}
+		replyToSeq = &orig.Seq
+	}
+
+	msg := &domain.Message{
+		ChatID:     chatID,
+		UserID:     userID,
+		Text:       text,
+		ReplyToID:  replyToID,
+		ReplyToSeq: replyToSeq,
+	}
 	if err := s.messages.Create(ctx, msg); err != nil {
 		return nil, fmt.Errorf("MessageService.SendMessage create: %w", err)
 	}

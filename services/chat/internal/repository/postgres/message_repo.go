@@ -23,17 +23,19 @@ func NewMessageRepo(db *pgxpool.Pool) *MessageRepo {
 }
 
 // Create atomically assigns the next seq for chatID via CTE and inserts the message.
+// m.ReplyToID is optional; if non-nil it is stored as reply_to_id.
 func (r *MessageRepo) Create(ctx context.Context, m *domain.Message) error {
-	slog.Debug("[MessageRepo.Create] inserting message", "chat_id", m.ChatID, "user_id", m.UserID)
+	slog.Debug("[MessageRepo.Create] inserting message",
+		"chat_id", m.ChatID, "user_id", m.UserID, "reply_to_id", m.ReplyToID)
 	row := r.db.QueryRow(ctx, `
 		WITH next_seq AS (
 			UPDATE chat_seqs SET last_seq = last_seq + 1 WHERE chat_id = $1 RETURNING last_seq
 		)
-		INSERT INTO messages (id, chat_id, user_id, text, seq, created_at)
-		SELECT gen_random_uuid(), $1, $2, $3, next_seq.last_seq, NOW()
+		INSERT INTO messages (id, chat_id, user_id, text, seq, reply_to_id, created_at)
+		SELECT gen_random_uuid(), $1, $2, $3, next_seq.last_seq, $4, NOW()
 		FROM next_seq
 		RETURNING id, seq, created_at`,
-		m.ChatID, m.UserID, m.Text)
+		m.ChatID, m.UserID, m.Text, m.ReplyToID)
 
 	if err := row.Scan(&m.ID, &m.Seq, &m.CreatedAt); err != nil {
 		return fmt.Errorf("MessageRepo.Create: %w", err)
@@ -43,12 +45,17 @@ func (r *MessageRepo) Create(ctx context.Context, m *domain.Message) error {
 }
 
 // GetByChatIDAfterSeq returns messages in chatID with seq > afterSeq, ordered ascending.
+// Reply preview fields (ReplyToSeq, ReplyToText, ReplyToUserName) are populated via LEFT JOIN.
 func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error) {
-	slog.Debug("[MessageRepo.GetByChatIDAfterSeq] query", "chat_id", chatID, "after_seq", afterSeq, "limit", limit)
+	slog.Debug("[MessageRepo.GetByChatIDAfterSeq] query",
+		"chat_id", chatID, "after_seq", afterSeq, "limit", limit)
 	rows, err := r.db.Query(ctx, `
-		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at
+		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at,
+		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
 		FROM messages m
-		LEFT JOIN users u ON u.id = m.user_id
+		LEFT JOIN users u  ON u.id  = m.user_id
+		LEFT JOIN messages rm ON rm.id = m.reply_to_id
+		LEFT JOIN users ru ON ru.id = rm.user_id
 		WHERE m.chat_id = $1 AND m.seq > $2 AND m.deleted_at IS NULL
 		ORDER BY m.seq ASC
 		LIMIT $3`,
@@ -67,12 +74,17 @@ func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID,
 }
 
 // ListByChatID returns messages for chatID in descending order (most recent first).
+// Reply preview fields are populated via LEFT JOIN.
 func (r *MessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error) {
-	slog.Debug("[MessageRepo.ListByChatID] query", "chat_id", chatID, "limit", limit, "offset", offset)
+	slog.Debug("[MessageRepo.ListByChatID] query",
+		"chat_id", chatID, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
-		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at
+		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at,
+		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
 		FROM messages m
-		LEFT JOIN users u ON u.id = m.user_id
+		LEFT JOIN users u  ON u.id  = m.user_id
+		LEFT JOIN messages rm ON rm.id = m.reply_to_id
+		LEFT JOIN users ru ON ru.id = rm.user_id
 		WHERE m.chat_id = $1 AND m.deleted_at IS NULL
 		ORDER BY m.seq DESC
 		LIMIT $2 OFFSET $3`,
@@ -97,8 +109,10 @@ func (r *MessageRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetByChatRange returns messages within the optional time range [from, to], paginated.
+// This method is not part of the ports.MessageRepository interface (used internally / by admin).
 func (r *MessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from, to *time.Time, limit, offset int) ([]*domain.Message, error) {
-	slog.Debug("[MessageRepo.GetByChatRange] query", "chat_id", chatID, "from", from, "to", to, "limit", limit, "offset", offset)
+	slog.Debug("[MessageRepo.GetByChatRange] query",
+		"chat_id", chatID, "from", from, "to", to, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
 		SELECT id, chat_id, user_id, text, seq, created_at, deleted_at
 		FROM messages
@@ -114,9 +128,16 @@ func (r *MessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from
 	}
 	defer rows.Close()
 
-	msgs, err := scanMessages(rows)
-	if err != nil {
-		return nil, err
+	var msgs []*domain.Message
+	for rows.Next() {
+		m := &domain.Message{}
+		if err := rows.Scan(&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt); err != nil {
+			return nil, fmt.Errorf("MessageRepo.GetByChatRange scan: %w", err)
+		}
+		msgs = append(msgs, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("MessageRepo.GetByChatRange rows: %w", err)
 	}
 	slog.Debug("[MessageRepo.GetByChatRange] fetched", "count", len(msgs))
 	return msgs, nil
@@ -140,19 +161,30 @@ func (r *MessageRepo) CountByChatRange(ctx context.Context, chatID uuid.UUID, fr
 }
 
 // GetByID returns a single message by its ID (including soft-deleted).
+// Reply preview fields are populated via LEFT JOIN when reply_to_id is set.
 func (r *MessageRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
 	slog.Debug("[MessageRepo.GetByID] query", "message_id", id)
-	row := r.db.QueryRow(ctx, `
-		SELECT id, chat_id, user_id, text, seq, created_at, deleted_at
-		FROM messages WHERE id = $1`, id)
 	m := &domain.Message{}
-	if err := row.Scan(&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt); err != nil {
+	err := r.db.QueryRow(ctx, `
+		SELECT m.id, m.chat_id, m.user_id, m.text, m.seq, m.created_at, m.deleted_at,
+		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
+		FROM messages m
+		LEFT JOIN messages rm ON rm.id = m.reply_to_id
+		LEFT JOIN users ru    ON ru.id = rm.user_id
+		WHERE m.id = $1`, id).Scan(
+		&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt,
+		&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("MessageRepo.GetByID: %w", err)
 	}
 	return m, nil
 }
 
 // scanMessages scans pgx rows into a slice of *domain.Message.
+// Expected column order: id, chat_id, user_id, user_name, text, seq, created_at, deleted_at,
+//
+//	reply_to_id, reply_to_seq, reply_to_text, reply_to_user_name
 func scanMessages(rows interface {
 	Next() bool
 	Scan(...any) error
@@ -161,7 +193,10 @@ func scanMessages(rows interface {
 	var msgs []*domain.Message
 	for rows.Next() {
 		m := &domain.Message{}
-		if err := rows.Scan(&m.ID, &m.ChatID, &m.UserID, &m.UserName, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt); err != nil {
+		if err := rows.Scan(
+			&m.ID, &m.ChatID, &m.UserID, &m.UserName, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt,
+			&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName,
+		); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
 		msgs = append(msgs, m)

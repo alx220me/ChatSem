@@ -27,7 +27,8 @@ func NewMessageHandler(svc *service.MessageService) *MessageHandler {
 }
 
 type sendMessageRequest struct {
-	Text string `json:"text"`
+	Text      string  `json:"text"`
+	ReplyToID *string `json:"reply_to_id,omitempty"`
 }
 
 // Send handles POST /api/chat/{chatID}/messages.
@@ -51,14 +52,30 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Debug("[MessageHandler.Send] request", "chat_id", chatID, "user_id", claims.UserID, "text_len", len(req.Text))
-	msg, err := h.svc.SendMessage(r.Context(), chatID, claims.UserID, claims.EventID, req.Text)
+	// Parse optional reply_to_id.
+	var replyToID *uuid.UUID
+	if req.ReplyToID != nil {
+		parsed, parseErr := uuid.Parse(*req.ReplyToID)
+		if parseErr != nil {
+			response.Error(w, http.StatusBadRequest, "bad_request", "invalid reply_to_id")
+			return
+		}
+		replyToID = &parsed
+	}
+
+	slog.Debug("[MessageHandler.Send] request",
+		"chat_id", chatID, "user_id", claims.UserID, "text_len", len(req.Text), "reply_to_id", replyToID)
+	msg, err := h.svc.SendMessage(r.Context(), chatID, claims.UserID, claims.EventID, req.Text, replyToID)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrEmptyMessage), errors.Is(err, domain.ErrMessageTooLong):
 			response.Error(w, http.StatusBadRequest, "bad_request", err.Error())
 		case errors.Is(err, domain.ErrUserBanned), errors.Is(err, domain.ErrUserMuted), errors.Is(err, domain.ErrForbidden):
 			response.Error(w, http.StatusForbidden, "forbidden", err.Error())
+		case errors.Is(err, domain.ErrNotFound):
+			response.Error(w, http.StatusBadRequest, "bad_request", "reply message not found")
+		case errors.Is(err, domain.ErrInvalidReply):
+			response.Error(w, http.StatusBadRequest, "bad_request", err.Error())
 		default:
 			slog.Warn("[MessageHandler.Send] error", "err", err)
 			response.Error(w, http.StatusInternalServerError, "internal_error", "failed to send message")
