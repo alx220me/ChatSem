@@ -8,7 +8,7 @@ interface AuthState {
 
 interface AuthContextValue {
   token: string | null
-  eventId: null
+  eventId: string | null
   userName: string | null
   api: AdminApiClient | null
   login: (username: string, password: string) => Promise<void>
