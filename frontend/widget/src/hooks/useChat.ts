@@ -7,7 +7,7 @@ interface UseChatResult {
   messages: Message[]
   loading: boolean
   error: string | null
-  sendMessage: (text: string) => Promise<SendResponse>
+  sendMessage: (text: string, replyToId?: string) => Promise<SendResponse>
 }
 
 export function useChat(
@@ -76,10 +76,10 @@ export function useChat(
   }, [api, eventId, roomId])
 
   const sendMessage = useCallback(
-    async (text: string): Promise<SendResponse> => {
+    async (text: string, replyToId?: string): Promise<SendResponse> => {
       if (!chat) throw new Error('no active chat')
       try {
-        return await api.sendMessage(chat.id, text)
+        return await api.sendMessage(chat.id, text, replyToId)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.warn('[useChat] sendMessage error', msg)

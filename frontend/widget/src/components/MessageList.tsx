@@ -10,6 +10,7 @@ interface MessageListProps {
   onDelete?: (msgId: string) => void
   onBan?: (userId: string, reason: string) => void
   onMute?: (userId: string, reason: string) => void
+  onReply?: (msg: Message) => void
 }
 
 interface ModTarget {
@@ -70,8 +71,10 @@ export function MessageList({
   onDelete,
   onBan,
   onMute,
+  onReply,
 }: MessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [modTarget, setModTarget] = useState<ModTarget | null>(null)
   const [modReason, setModReason] = useState('')
@@ -91,6 +94,13 @@ export function MessageList({
     setModReason('')
   }
 
+  function scrollToSeq(seq: number) {
+    const el = listRef.current?.querySelector(`[data-seq="${seq}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -108,16 +118,17 @@ export function MessageList({
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0', position: 'relative' }}>
+    <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 0', position: 'relative' }}>
       {messages.map((msg) => {
         const isOwn = msg.userId === currentUserId
         const canDelete = (isOwn || isMod) && msg.seq !== -1
         const canBan = isMod && !isOwn && msg.seq !== -1
-        const showActions = hoveredId === msg.id && (canDelete || canBan)
+        const showActions = hoveredId === msg.id && (canDelete || canBan || !!onReply)
 
         return (
           <div
             key={msg.id}
+            data-seq={msg.seq}
             style={{
               display: 'flex',
               gap: 8,
@@ -143,6 +154,36 @@ export function MessageList({
                 <span style={{ fontWeight: 600, color: '#333' }}>{msg.userName ?? msg.userId}</span>
                 <span>{new Date(msg.createdAt).toLocaleTimeString()}</span>
               </div>
+
+              {/* Reply quote block */}
+              {msg.replyToId && (
+                <div
+                  onClick={() => msg.replyToSeq != null && scrollToSeq(msg.replyToSeq)}
+                  title="Перейти к оригинальному сообщению"
+                  style={{
+                    cursor: msg.replyToSeq != null ? 'pointer' : 'default',
+                    marginBottom: 4,
+                    padding: '4px 8px',
+                    background: '#f0f4ff',
+                    borderLeft: '3px solid #2563eb',
+                    borderRadius: '0 4px 4px 0',
+                    fontSize: 12,
+                    color: '#4b5563',
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <span style={{ fontWeight: 600, color: '#2563eb', marginRight: 4 }}>
+                    {msg.replyToUserName || 'User'}
+                  </span>
+                  <span style={{ color: '#6b7280' }}>
+                    {msg.replyToText
+                      ? (msg.replyToText.length > 80 ? msg.replyToText.slice(0, 80) + '…' : msg.replyToText)
+                      : '…'}
+                  </span>
+                </div>
+              )}
+
               <div
                 style={{
                   fontSize: 14,
@@ -171,6 +212,15 @@ export function MessageList({
                   boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
                 }}
               >
+                {onReply && msg.seq !== -1 && (
+                  <button
+                    title="Ответить"
+                    onClick={() => onReply(msg)}
+                    style={actionBtnStyle}
+                  >
+                    ↩
+                  </button>
+                )}
                 {canDelete && (
                   <button
                     title="Удалить сообщение"

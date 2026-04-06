@@ -51,7 +51,7 @@ func (s *ExportService) ExportMessages(ctx context.Context, w io.Writer, chatID 
 
 func (s *ExportService) exportCSV(ctx context.Context, w io.Writer, chatID uuid.UUID, from, to *time.Time) error {
 	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"id", "seq", "text", "user_id", "created_at"}); err != nil {
+	if err := cw.Write([]string{"id", "seq", "text", "user_id", "created_at", "reply_to_id"}); err != nil {
 		return fmt.Errorf("ExportService.exportCSV: write header: %w", err)
 	}
 	cw.Flush()
@@ -73,12 +73,17 @@ func (s *ExportService) exportCSV(ctx context.Context, w io.Writer, chatID uuid.
 		slog.Debug("[ExportService] batch written", "format", "csv", "batch_num", batchCount, "count", len(batch))
 
 		for _, msg := range batch {
+			replyToID := ""
+			if msg.ReplyToID != nil {
+				replyToID = msg.ReplyToID.String()
+			}
 			if err := cw.Write([]string{
 				msg.ID.String(),
 				strconv.FormatInt(msg.Seq, 10),
 				msg.Text,
 				msg.UserID.String(),
 				msg.CreatedAt.Format(time.RFC3339),
+				replyToID,
 			}); err != nil {
 				return fmt.Errorf("ExportService.exportCSV: write row: %w", err)
 			}

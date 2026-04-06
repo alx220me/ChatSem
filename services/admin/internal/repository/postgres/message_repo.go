@@ -24,16 +24,20 @@ func NewMessageRepo(db *pgxpool.Pool) *MessageRepo {
 
 // GetByChatRange returns non-deleted messages for chatID within the optional time range,
 // ordered by seq ascending, with pagination.
+// Reply preview fields (ReplyToSeq, ReplyToText) are populated via LEFT JOIN when reply_to_id is set.
 func (r *MessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from, to *time.Time, limit, offset int) ([]*domain.Message, error) {
 	slog.Debug("[AdminMessageRepo.GetByChatRange] query", "chat_id", chatID, "from", from, "to", to, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
-		SELECT id, chat_id, user_id, text, seq, created_at
-		FROM messages
-		WHERE chat_id = $1
-		  AND deleted_at IS NULL
-		  AND ($2::TIMESTAMPTZ IS NULL OR created_at >= $2)
-		  AND ($3::TIMESTAMPTZ IS NULL OR created_at <= $3)
-		ORDER BY seq ASC
+		SELECT m.id, m.chat_id, m.user_id, m.text, m.seq, m.created_at,
+		       m.reply_to_id, rm.seq, LEFT(rm.text, 100), COALESCE(ru.name, '')
+		FROM messages m
+		LEFT JOIN messages rm ON rm.id = m.reply_to_id
+		LEFT JOIN users ru    ON ru.id = rm.user_id
+		WHERE m.chat_id = $1
+		  AND m.deleted_at IS NULL
+		  AND ($2::TIMESTAMPTZ IS NULL OR m.created_at >= $2)
+		  AND ($3::TIMESTAMPTZ IS NULL OR m.created_at <= $3)
+		ORDER BY m.seq ASC
 		LIMIT $4 OFFSET $5`,
 		chatID, from, to, limit, offset)
 	if err != nil {
@@ -44,7 +48,10 @@ func (r *MessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from
 	var msgs []*domain.Message
 	for rows.Next() {
 		m := &domain.Message{}
-		if err := rows.Scan(&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt,
+			&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName,
+		); err != nil {
 			return nil, fmt.Errorf("AdminMessageRepo.GetByChatRange scan: %w", err)
 		}
 		msgs = append(msgs, m)

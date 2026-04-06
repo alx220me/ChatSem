@@ -22,6 +22,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   const [pollError, setPollError] = useState<string | null>(null)
   const [allMessages, setAllMessages] = useState<Message[]>([])
   const [initialized, setInitialized] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null)
 
   // Merge initial messages from useChat into allMessages once loaded
   React.useEffect(() => {
@@ -100,10 +101,10 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   )
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, replyToId?: string) => {
       if (!chat) return
 
-      // Optimistic message — show immediately in allMessages
+      // Optimistic message — show immediately with reply preview if replying
       const optimisticId = `opt-${Date.now()}`
       const optimistic: Message = {
         id: optimisticId,
@@ -113,11 +114,16 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         text,
         seq: -1,
         createdAt: new Date().toISOString(),
+        replyToId: replyingTo?.id,
+        replyToSeq: replyingTo?.seq,
+        replyToText: replyingTo?.text,
+        replyToUserName: replyingTo?.userName,
       }
       setAllMessages((prev) => [...prev, optimistic])
+      setReplyingTo(null)
 
       try {
-        const response = await sendMessage(text)
+        const response = await sendMessage(text, replyToId)
         // Replace optimistic entry with confirmed data
         setAllMessages((prev) =>
           prev.map((m) =>
@@ -132,7 +138,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         throw err
       }
     },
-    [chat, sendMessage],
+    [chat, sendMessage, replyingTo],
   )
 
   return (
@@ -241,8 +247,14 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             onDelete={handleDelete}
             onBan={handleBan}
             onMute={handleMute}
+            onReply={setReplyingTo}
           />
-          <MessageInput onSend={handleSend} disabled={loading || !chat} />
+          <MessageInput
+            onSend={handleSend}
+            disabled={loading || !chat}
+            replyingTo={replyingTo ?? undefined}
+            onCancelReply={() => setReplyingTo(null)}
+          />
         </>
       )}
     </div>

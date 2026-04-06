@@ -99,8 +99,10 @@ export class ApiClient {
     return res.messages ?? []
   }
 
-  async sendMessage(chatId: string, text: string): Promise<SendResponse> {
-    return this.request<SendResponse>('POST', `/chat/${chatId}/messages`, { text })
+  async sendMessage(chatId: string, text: string, replyToId?: string): Promise<SendResponse> {
+    const body: Record<string, unknown> = { text }
+    if (replyToId) body.reply_to_id = replyToId
+    return this.request<SendResponse>('POST', `/chat/${chatId}/messages`, body)
   }
 
   async poll(chatId: string, afterSeq: number, afterDeleteSeq: number, signal: AbortSignal): Promise<PollResponse> {

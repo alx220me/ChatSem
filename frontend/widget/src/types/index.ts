@@ -14,6 +14,11 @@ export interface Message {
   text: string
   seq: number
   createdAt: string
+  // Reply fields — populated by the server when the message is a reply.
+  replyToId?: string
+  replyToSeq?: number
+  replyToText?: string
+  replyToUserName?: string
 }
 
 export interface SendResponse {
