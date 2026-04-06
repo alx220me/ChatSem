@@ -12,7 +12,6 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
   const { api } = useAuth()
   const [name, setName] = useState('')
   const [allowedOrigin, setAllowedOrigin] = useState('')
-  const [apiSecret, setApiSecret] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
@@ -26,9 +25,9 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
       if (import.meta.env.DEV) {
         console.debug('[EventsPage] createEvent', name)
       }
-      const event = await api.createEvent(name, allowedOrigin, apiSecret)
+      const event = await api.createEvent(name, allowedOrigin)
       console.info('[EventsPage] event created', event.id)
-      setCreatedSecret(apiSecret)
+      setCreatedSecret(event.api_secret)
       onCreated(event)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event')
@@ -111,16 +110,6 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
                 value={allowedOrigin}
                 onChange={(e) => setAllowedOrigin(e.target.value)}
                 placeholder="https://example.com"
-                required
-                style={inputStyle}
-              />
-            </label>
-            <label style={labelStyle}>
-              API Secret
-              <input
-                type="password"
-                value={apiSecret}
-                onChange={(e) => setApiSecret(e.target.value)}
                 required
                 style={inputStyle}
               />

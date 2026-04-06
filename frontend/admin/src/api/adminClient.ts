@@ -1,5 +1,10 @@
 import type { Ban, Chat, Event, Mute, User } from '../types'
 
+/** Returned once at event creation — contains the plaintext API secret. */
+export interface CreateEventResponse extends Event {
+  api_secret: string
+}
+
 export class AdminApiClient {
   private baseUrl: string
   private getToken: () => string
@@ -41,8 +46,11 @@ export class AdminApiClient {
     return this.request<Event[]>('GET', '/api/admin/events')
   }
 
-  async createEvent(name: string, allowedOrigin: string, apiSecret: string): Promise<Event> {
-    return this.request<Event>('POST', '/api/admin/events', { name, allowedOrigin, apiSecret })
+  async createEvent(name: string, allowedOrigin: string): Promise<CreateEventResponse> {
+    return this.request<CreateEventResponse>('POST', '/api/admin/events', {
+      name,
+      allowed_origin: allowedOrigin,
+    })
   }
 
   // Chats

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"chatsem/services/admin/internal/ports"
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
@@ -14,11 +15,11 @@ import (
 
 // MuteService implements business logic for user mutes.
 type MuteService struct {
-	mutes domain.MuteRepository
+	mutes ports.MuteRepository
 }
 
 // NewMuteService creates a MuteService backed by the given repository.
-func NewMuteService(mutes domain.MuteRepository) *MuteService {
+func NewMuteService(mutes ports.MuteRepository) *MuteService {
 	return &MuteService{mutes: mutes}
 }
 

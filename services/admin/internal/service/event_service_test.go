@@ -16,10 +16,14 @@ func TestCreateEvent_CreatesParentChat(t *testing.T) {
 	chatRepo := adminpostgres.NewChatRepo(pool)
 	svc := service.NewEventService(eventRepo, chatRepo)
 
-	event, err := svc.CreateEvent(context.Background(), "test-event-chat", "http://localhost", "raw-secret")
+	event, plainSecret, err := svc.CreateEvent(context.Background(), "test-event-chat", "http://localhost")
 	if err != nil {
 		t.Fatalf("[%s] CreateEvent: %v", t.Name(), err)
 	}
+	if len(plainSecret) != 64 {
+		t.Errorf("[%s] expected 64-char secret, got %d chars", t.Name(), len(plainSecret))
+	}
+	t.Logf("[%s] assert: secret is 64-char hex", t.Name())
 
 	t.Cleanup(func() {
 		pool.Exec(context.Background(), `DELETE FROM chats WHERE event_id=$1`, event.ID)

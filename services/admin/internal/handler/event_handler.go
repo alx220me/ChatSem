@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"chatsem/services/admin/internal/service"
 	"chatsem/shared/pkg/response"
@@ -25,7 +26,18 @@ func NewEventHandler(svc *service.EventService) *EventHandler {
 type createEventRequest struct {
 	Name          string `json:"name"`
 	AllowedOrigin string `json:"allowed_origin"`
-	APISecret     string `json:"api_secret"`
+}
+
+// createEventResponse wraps the created event and includes the plaintext API secret
+// (returned only once — the server stores only the bcrypt hash).
+type createEventResponse struct {
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	AllowedOrigin string    `json:"allowed_origin"`
+	CreatedAt     time.Time `json:"created_at"`
+	// APISecret is the plaintext secret shown exactly once at creation time.
+	// Store it securely — it cannot be recovered later.
+	APISecret string `json:"api_secret"`
 }
 
 // CreateEvent handles POST /api/admin/events.
@@ -35,13 +47,14 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 		return
 	}
-	if req.Name == "" || req.AllowedOrigin == "" || req.APISecret == "" {
-		response.Error(w, http.StatusBadRequest, "bad_request", "name, allowed_origin and api_secret are required")
+	if req.Name == "" || req.AllowedOrigin == "" {
+		response.Error(w, http.StatusBadRequest, "bad_request", "name and allowed_origin are required")
 		return
 	}
 
 	slog.Debug("[EventHandler.CreateEvent] request", "name", req.Name, "origin", req.AllowedOrigin)
-	event, err := h.svc.CreateEvent(r.Context(), req.Name, req.AllowedOrigin, req.APISecret)
+
+	event, plainSecret, err := h.svc.CreateEvent(r.Context(), req.Name, req.AllowedOrigin)
 	if err != nil {
 		slog.Warn("[EventHandler.CreateEvent] error", "err", err)
 		response.Error(w, http.StatusInternalServerError, "internal_error", "failed to create event")
@@ -49,7 +62,13 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("[EventHandler.CreateEvent] created", "event_id", event.ID)
-	response.JSON(w, http.StatusCreated, event)
+	response.JSON(w, http.StatusCreated, createEventResponse{
+		ID:            event.ID,
+		Name:          event.Name,
+		AllowedOrigin: event.AllowedOrigin,
+		CreatedAt:     event.CreatedAt,
+		APISecret:     plainSecret,
+	})
 }
 
 // ListEvents handles GET /api/admin/events.
@@ -74,7 +93,6 @@ func (h *EventHandler) CreateParentChat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	slog.Debug("[EventHandler.CreateParentChat] request", "event_id", eventID)
-	// Re-use the parent chat creation via service.
 	event, err := h.svc.GetEvent(r.Context(), eventID)
 	if err != nil {
 		response.Error(w, http.StatusNotFound, "not_found", "event not found")

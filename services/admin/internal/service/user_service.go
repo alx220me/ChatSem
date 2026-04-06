@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"chatsem/services/admin/internal/ports"
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
@@ -12,11 +13,11 @@ import (
 
 // UserService implements business logic for user management.
 type UserService struct {
-	users domain.UserRepository
+	users ports.UserRepository
 }
 
 // NewUserService creates a UserService backed by the given repository.
-func NewUserService(users domain.UserRepository) *UserService {
+func NewUserService(users ports.UserRepository) *UserService {
 	return &UserService{users: users}
 }
 

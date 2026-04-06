@@ -41,8 +41,15 @@ describe('EventsPage', () => {
     })
   })
 
-  it('TestCreateEvent_Form: modal submit calls createEvent and updates list', async () => {
-    const newEvent: Event = { id: 'ev-3', name: 'New Conf', allowedOrigin: 'https://c.com', createdAt: '2026-01-03T00:00:00Z' }
+  it('TestCreateEvent_Form: modal submit calls createEvent and shows generated secret', async () => {
+    const generatedSecret = 'a'.repeat(64)
+    const newEvent: Event & { api_secret: string } = {
+      id: 'ev-3',
+      name: 'New Conf',
+      allowedOrigin: 'https://c.com',
+      createdAt: '2026-01-03T00:00:00Z',
+      api_secret: generatedSecret,
+    }
     const api = makeApi({ createEvent: vi.fn().mockResolvedValueOnce(newEvent) })
     renderPage(api)
 
@@ -52,16 +59,15 @@ describe('EventsPage', () => {
     // Open modal
     await userEvent.click(screen.getByRole('button', { name: /create event/i }))
 
-    // Fill form
+    // Fill form — no API Secret field anymore
     const dialog = screen.getByRole('heading', { name: /create event/i }).closest('div')!
     await userEvent.type(within(dialog).getByLabelText(/^name$/i), 'New Conf')
     await userEvent.type(within(dialog).getByLabelText(/allowed origin/i), 'https://c.com')
-    await userEvent.type(within(dialog).getByLabelText(/api secret/i), 'secret')
     await userEvent.click(within(dialog).getByRole('button', { name: /create$/i }))
 
-    expect(api.createEvent).toHaveBeenCalledWith('New Conf', 'https://c.com', 'secret')
+    expect(api.createEvent).toHaveBeenCalledWith('New Conf', 'https://c.com')
     await waitFor(() => {
-      expect(screen.getByText('New Conf')).toBeInTheDocument()
+      expect(screen.getByText(generatedSecret)).toBeInTheDocument()
     })
   })
 })

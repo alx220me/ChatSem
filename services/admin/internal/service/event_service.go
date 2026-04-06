@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 
+	"chatsem/services/admin/internal/ports"
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
@@ -13,22 +16,29 @@ import (
 
 // EventService implements business logic for event management.
 type EventService struct {
-	events domain.EventRepository
-	chats  domain.ChatRepository
+	events ports.EventRepository
+	chats  ports.ChatRepository
 }
 
 // NewEventService creates an EventService backed by the given repositories.
-func NewEventService(events domain.EventRepository, chats domain.ChatRepository) *EventService {
+func NewEventService(events ports.EventRepository, chats ports.ChatRepository) *EventService {
 	return &EventService{events: events, chats: chats}
 }
 
-// CreateEvent creates a new event with a bcrypt-hashed API secret and a parent chat.
-func (s *EventService) CreateEvent(ctx context.Context, name, allowedOrigin, apiSecret string) (*domain.Event, error) {
-	slog.Debug("[EventService.CreateEvent] start", "name", name)
+// CreateEvent generates a cryptographically secure API secret, hashes it with bcrypt,
+// persists the event, and returns both the event and the plaintext secret (shown once).
+func (s *EventService) CreateEvent(ctx context.Context, name, allowedOrigin string) (*domain.Event, string, error) {
+	slog.Debug("[EventService.CreateEvent] start", "name", name, "origin", allowedOrigin)
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(apiSecret), bcrypt.DefaultCost)
+	plainSecret, err := generateSecret()
 	if err != nil {
-		return nil, fmt.Errorf("EventService.CreateEvent bcrypt: %w", err)
+		return nil, "", fmt.Errorf("EventService.CreateEvent generate secret: %w", err)
+	}
+	slog.Debug("[EventService.CreateEvent] secret generated")
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(plainSecret), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, "", fmt.Errorf("EventService.CreateEvent bcrypt: %w", err)
 	}
 
 	e := &domain.Event{
@@ -38,32 +48,30 @@ func (s *EventService) CreateEvent(ctx context.Context, name, allowedOrigin, api
 		Settings:      []byte("{}"),
 	}
 	if err := s.events.Create(ctx, e); err != nil {
-		return nil, fmt.Errorf("EventService.CreateEvent insert: %w", err)
+		return nil, "", fmt.Errorf("EventService.CreateEvent insert: %w", err)
 	}
 	slog.Info("[EventService.CreateEvent] created", "event_id", e.ID)
 
-	// Create parent chat + seq counter.
 	if err := s.createParentChat(ctx, e.ID); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return e, nil
+	return e, plainSecret, nil
+}
+
+// generateSecret returns a 64-character hex string from 32 random bytes.
+func generateSecret() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generateSecret: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func (s *EventService) createParentChat(ctx context.Context, eventID uuid.UUID) error {
 	slog.Debug("[EventService.createParentChat] start", "event_id", eventID)
 
-	// Insert parent chat via GetOrCreateChild stub — admin ChatRepo has its own Create path.
-	// Use a direct approach: the domain.ChatRepository doesn't expose a bare Create method,
-	// so we rely on GetOrCreateChild to create the child.
-	// For parent chats, we need a separate method. We'll expose it via the chat repo directly
-	// by using a type assertion or a dedicated interface. Here we use a dedicated insert approach.
-
-	// Insert parent chat directly using the EventRepository's underlying connection.
-	// Since ChatRepository doesn't have CreateParent, we add that to admin's ChatRepo.
-	chatID, err := s.chats.(interface {
-		CreateParent(ctx context.Context, eventID uuid.UUID) (uuid.UUID, error)
-	}).CreateParent(ctx, eventID)
+	chatID, err := s.chats.CreateParent(ctx, eventID)
 	if err != nil {
 		return fmt.Errorf("EventService.createParentChat insert: %w", err)
 	}
@@ -72,7 +80,7 @@ func (s *EventService) createParentChat(ctx context.Context, eventID uuid.UUID) 
 		return fmt.Errorf("EventService.createParentChat init seq: %w", err)
 	}
 
-	slog.Info("[EventService.CreateParentChat] parent chat created", "event_id", eventID, "chat_id", chatID)
+	slog.Info("[EventService.createParentChat] parent chat created", "event_id", eventID, "chat_id", chatID)
 	return nil
 }
 
@@ -96,7 +104,7 @@ func (s *EventService) UpdateChatSettings(ctx context.Context, chatID uuid.UUID,
 	return nil
 }
 
-// ListEvents returns all events with pagination.
+// ListEvents returns all events.
 func (s *EventService) ListEvents(ctx context.Context) ([]*domain.Event, error) {
 	slog.Debug("[EventService.ListEvents] start")
 	events, err := s.events.List(ctx)

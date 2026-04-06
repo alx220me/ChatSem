@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"chatsem/services/admin/internal/ports"
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
@@ -14,12 +15,12 @@ import (
 
 // BanService implements business logic for user bans.
 type BanService struct {
-	bans domain.BanRepository
+	bans ports.BanRepository
 	rdb  *redis.Client
 }
 
 // NewBanService creates a BanService backed by the given repository and Redis client.
-func NewBanService(bans domain.BanRepository, rdb *redis.Client) *BanService {
+func NewBanService(bans ports.BanRepository, rdb *redis.Client) *BanService {
 	return &BanService{bans: bans, rdb: rdb}
 }
 
