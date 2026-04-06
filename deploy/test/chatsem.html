@@ -66,6 +66,9 @@
 
   const NAMES = ['Алексей','Мария','Иван','Анна','Дмитрий','Елена','Сергей','Ольга','Андрей','Татьяна'];
 
+  // Store credentials per slot for token refresh
+  const credentials = {};
+
   function randomName() {
     return NAMES[Math.floor(Math.random() * NAMES.length)];
   }
@@ -74,50 +77,59 @@
     return 'user-' + Math.random().toString(36).slice(2, 8);
   }
 
-  // Fill on page load
   window.addEventListener('DOMContentLoaded', () => {
     for (let n = 1; n <= 2; n++) {
-      document.getElementById('name'  + n).value  = randomName();
+      document.getElementById('name'  + n).value = randomName();
       document.getElementById('extid' + n).value = randomExtId();
     }
   });
 
+  async function fetchToken(secret, externalId, name, role) {
+    const res = await fetch('/api/auth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${secret}`,
+      },
+      body: JSON.stringify({
+        external_user_id: externalId,
+        event_id: EVENT_ID,
+        name: name,
+        role: role || 'user',
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const { token } = await res.json();
+    return token;
+  }
+
   async function connect(n) {
-    const secret   = document.getElementById('secret' + n).value.trim();
-    const name     = document.getElementById('name' + n).value.trim();
+    const secret     = document.getElementById('secret' + n).value.trim();
+    const name       = document.getElementById('name' + n).value.trim();
     const externalId = document.getElementById('extid' + n).value.trim();
-    const statusEl = document.getElementById('status' + n);
+    const statusEl   = document.getElementById('status' + n);
 
     statusEl.className = 'status ok';
     statusEl.textContent = 'Получаем токен...';
 
     try {
-      const res = await fetch('/api/auth/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${secret}`,
-        },
-        body: JSON.stringify({
-          external_user_id: externalId,
-          event_id: EVENT_ID,
-          name: name,
-          role: 'user',
-        }),
-      });
+      const token = await fetchToken(secret, externalId, name);
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-
-      const { token } = await res.json();
+      // Store credentials for token refresh
+      credentials[n] = { secret, externalId, name };
 
       window.ChatSem.init({
         containerId: 'chat' + n,
         eventId: EVENT_ID,
         token: token,
         roomId: ROOM_ID,
+        onTokenExpired: async () => {
+          const c = credentials[n];
+          return fetchToken(c.secret, c.externalId, c.name);
+        },
       });
 
       statusEl.textContent = `✓ Подключён как ${name}`;

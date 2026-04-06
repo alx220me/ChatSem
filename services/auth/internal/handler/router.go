@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"chatsem/services/auth/internal/middleware"
-	"chatsem/shared/domain"
+	"chatsem/services/auth/internal/ports"
 	"chatsem/shared/pkg/response"
 
 	"github.com/go-chi/chi/v5"
@@ -12,7 +12,7 @@ import (
 )
 
 // NewRouter creates the chi router for the auth service with standard middleware.
-func NewRouter(tokenHandler *TokenHandler, eventRepo domain.EventRepository) http.Handler {
+func NewRouter(tokenHandler *TokenHandler, eventRepo ports.EventRepository) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimiddleware.RealIP)

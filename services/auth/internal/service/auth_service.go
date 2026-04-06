@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"chatsem/services/auth/internal/ports"
 	"chatsem/shared/domain"
 	"chatsem/shared/pkg/jwt"
 
@@ -24,16 +25,16 @@ type TokenRequest struct {
 
 // AuthService handles SSO token exchange.
 type AuthService struct {
-	eventRepo domain.EventRepository
-	userRepo  domain.UserRepository
+	eventRepo ports.EventRepository
+	userRepo  ports.UserRepository
 	jwtSecret string
 	jwtTTL    time.Duration
 }
 
 // NewAuthService creates an AuthService.
 func NewAuthService(
-	eventRepo domain.EventRepository,
-	userRepo domain.UserRepository,
+	eventRepo ports.EventRepository,
+	userRepo ports.UserRepository,
 	jwtSecret string,
 	jwtTTL time.Duration,
 ) *AuthService {

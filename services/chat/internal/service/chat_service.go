@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"chatsem/services/chat/internal/ports"
 	"chatsem/shared/domain"
 
 	"github.com/google/uuid"
@@ -12,11 +13,11 @@ import (
 
 // ChatService implements business logic for chat hierarchy.
 type ChatService struct {
-	chats domain.ChatRepository
+	chats ports.ChatRepository
 }
 
 // NewChatService creates a ChatService backed by the given repository.
-func NewChatService(chats domain.ChatRepository) *ChatService {
+func NewChatService(chats ports.ChatRepository) *ChatService {
 	return &ChatService{chats: chats}
 }
 

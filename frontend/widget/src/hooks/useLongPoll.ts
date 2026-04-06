@@ -68,20 +68,27 @@ export function useLongPoll(
 
           onErrorRef.current?.(err)
 
-          // Reconnect from lastKnownSeq - 1 to avoid missing a message on reconnect
-          lastKnownSeq = Math.max(0, lastKnownSeq - 1)
+          // 401 — token expired and no refresh available; stop polling
+          if (err instanceof HttpError && err.status === 401) {
+            if (import.meta.env.DEV) {
+              console.warn('[useLongPoll] session expired, stopping poll loop')
+            }
+            break
+          }
 
           let delay = retryDelay
 
           if (err instanceof HttpError && err.status === 429) {
-            // Respect Retry-After header from the server
+            // Rate limited — do NOT decrement seq, just wait
             delay = err.retryAfter > 0 ? err.retryAfter * 1000 : 60_000
             retryDelay = 1_000 // reset backoff after rate-limit clears
             if (import.meta.env.DEV) {
               console.warn('[useLongPoll] rate limited, waiting', delay, 'ms')
             }
           } else {
-            // Exponential backoff for other errors: 1s → 2s → 4s → … → 30s
+            // Network/server error — step back one seq to avoid missing a message on reconnect
+            lastKnownSeq = Math.max(0, lastKnownSeq - 1)
+            // Exponential backoff: 1s → 2s → 4s → … → 30s
             retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY)
             if (import.meta.env.DEV) {
               console.warn('[useLongPoll] disconnected, retry in', delay, 'ms', err)

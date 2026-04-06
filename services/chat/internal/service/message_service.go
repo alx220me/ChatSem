@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"chatsem/services/chat/internal/ports"
 	"chatsem/shared/domain"
 	"chatsem/shared/pkg/longpoll"
 
@@ -16,16 +17,16 @@ import (
 
 // MessageService implements business logic for message sending, listing, and moderation.
 type MessageService struct {
-	messages domain.MessageRepository
-	mutes    domain.MuteRepository
+	messages ports.MessageRepository
+	mutes    ports.MuteRepository
 	broker   longpoll.Broker
 	rdb      *redis.Client
 }
 
 // NewMessageService creates a MessageService backed by the given repositories and broker.
 func NewMessageService(
-	messages domain.MessageRepository,
-	mutes domain.MuteRepository,
+	messages ports.MessageRepository,
+	mutes ports.MuteRepository,
 	broker longpoll.Broker,
 	rdb *redis.Client,
 ) *MessageService {

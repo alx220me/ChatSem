@@ -8,7 +8,7 @@ import (
 // Config holds all runtime configuration for the chat service.
 type Config struct {
 	Addr        string // HTTP listen address, e.g. ":8080"
-	DatabaseURL string // PostgreSQL DSN
+	DatabaseURL string // PostgreSQL connection string
 	RedisAddr   string // Redis address, e.g. "localhost:6379"
 	JWTSecret   string // HMAC secret for JWT validation
 }
@@ -17,7 +17,7 @@ type Config struct {
 func Load() *Config {
 	cfg := &Config{
 		Addr:        getenv("CHAT_ADDR", ":8080"),
-		DatabaseURL: getenv("DATABASE_URL", "postgres://localhost:5432/chatsem?sslmode=disable"),
+		DatabaseURL: getenv("DATABASE_URL", "postgres://chatsem:chatsem@localhost:5432/chatsem"),
 		RedisAddr:   getenv("REDIS_ADDR", "localhost:6379"),
 		JWTSecret:   getenv("JWT_SECRET", "change-me-in-production"),
 	}

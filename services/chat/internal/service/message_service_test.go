@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"chatsem/services/chat/internal/ports"
 	"chatsem/services/chat/internal/service"
 	"chatsem/shared/domain"
 	"chatsem/shared/pkg/longpoll"
@@ -40,13 +41,6 @@ func (m *mockMessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.U
 func (m *mockMessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error) {
 	return nil, nil
 }
-func (m *mockMessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from, to *time.Time, limit, offset int) ([]*domain.Message, error) {
-	return nil, nil
-}
-func (m *mockMessageRepo) CountByChatRange(ctx context.Context, chatID uuid.UUID, from, to *time.Time) (int64, error) {
-	return 0, nil
-}
-
 // --- mock MuteRepository ---
 
 type mockMuteRepo struct {
@@ -54,13 +48,8 @@ type mockMuteRepo struct {
 }
 
 func (m *mockMuteRepo) Create(ctx context.Context, mute *domain.Mute) error { return nil }
-func (m *mockMuteRepo) Delete(ctx context.Context, id uuid.UUID) error       { return nil }
 func (m *mockMuteRepo) GetActive(ctx context.Context, chatID, userID uuid.UUID) (*domain.Mute, error) {
 	return nil, domain.ErrNotFound
-}
-func (m *mockMuteRepo) Expire(ctx context.Context, muteID uuid.UUID) error { return nil }
-func (m *mockMuteRepo) ListByChatID(ctx context.Context, chatID uuid.UUID) ([]*domain.Mute, error) {
-	return nil, nil
 }
 func (m *mockMuteRepo) IsUserMuted(ctx context.Context, userID, chatID uuid.UUID) (bool, error) {
 	if m.isUserMuted != nil {
@@ -70,7 +59,7 @@ func (m *mockMuteRepo) IsUserMuted(ctx context.Context, userID, chatID uuid.UUID
 }
 
 // newSvc creates a MessageService with in-memory broker and nil Redis (ban check will fail-open).
-func newSvc(msgs domain.MessageRepository, mutes domain.MuteRepository) *service.MessageService {
+func newSvc(msgs ports.MessageRepository, mutes ports.MuteRepository) *service.MessageService {
 	broker := longpoll.NewInMemoryBroker()
 	return service.NewMessageService(msgs, mutes, broker, nil)
 }

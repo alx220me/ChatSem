@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"chatsem/services/chat/internal/middleware"
+	"chatsem/services/chat/internal/ports"
 	"chatsem/shared/domain"
 	"chatsem/shared/pkg/longpoll"
 	"chatsem/shared/pkg/response"
@@ -21,12 +22,12 @@ import (
 // PollHandler handles long-poll requests for new messages.
 type PollHandler struct {
 	broker   longpoll.Broker
-	messages domain.MessageRepository
+	messages ports.MessageRepository
 	rdb      *redis.Client
 }
 
 // NewPollHandler creates a PollHandler backed by the given broker and message repository.
-func NewPollHandler(broker longpoll.Broker, messages domain.MessageRepository, rdb *redis.Client) *PollHandler {
+func NewPollHandler(broker longpoll.Broker, messages ports.MessageRepository, rdb *redis.Client) *PollHandler {
 	return &PollHandler{broker: broker, messages: messages, rdb: rdb}
 }
 

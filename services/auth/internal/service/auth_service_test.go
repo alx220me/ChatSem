@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"chatsem/services/auth/internal/ports"
 	"chatsem/services/auth/internal/service"
 	authpostgres "chatsem/services/auth/internal/repository/postgres"
 	"chatsem/shared/domain"
@@ -26,9 +27,6 @@ type mockEventRepo struct {
 func (m *mockEventRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Event, error) {
 	return m.getByID(ctx, id)
 }
-func (m *mockEventRepo) Create(ctx context.Context, e *domain.Event) error   { return nil }
-func (m *mockEventRepo) List(ctx context.Context) ([]*domain.Event, error)    { return nil, nil }
-
 // --- mock UserRepository ---
 
 type mockUserRepo struct {
@@ -37,18 +35,6 @@ type mockUserRepo struct {
 
 func (m *mockUserRepo) Upsert(ctx context.Context, u *domain.User) (*domain.User, error) {
 	return m.upsert(ctx, u)
-}
-func (m *mockUserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	return nil, nil
-}
-func (m *mockUserRepo) GetByExternalID(ctx context.Context, externalID string, eventID uuid.UUID) (*domain.User, error) {
-	return nil, nil
-}
-func (m *mockUserRepo) ListByEventID(ctx context.Context, eventID uuid.UUID, limit, offset int) ([]*domain.User, error) {
-	return nil, nil
-}
-func (m *mockUserRepo) UpdateRole(ctx context.Context, id uuid.UUID, role domain.UserRole) error {
-	return nil
 }
 
 // --- helpers ---
@@ -65,7 +51,7 @@ func bcryptHash(t *testing.T, secret string) string {
 	return string(h)
 }
 
-func newTestSvc(eventRepo domain.EventRepository, userRepo domain.UserRepository) *service.AuthService {
+func newTestSvc(eventRepo ports.EventRepository, userRepo ports.UserRepository) *service.AuthService {
 	return service.NewAuthService(eventRepo, userRepo, testJWTSecret, time.Hour)
 }
 
@@ -190,7 +176,7 @@ func TestExchangeToken_InvalidRole(t *testing.T) {
 		}},
 	)
 
-	for _, role := range []string{"admin", "superuser", ""} {
+	for _, role := range []string{"superuser", "guest", ""} {
 		_, err := svc.ExchangeToken(context.Background(), service.TokenRequest{
 			ExternalUserID: "ext-1",
 			EventID:        uuid.New(),

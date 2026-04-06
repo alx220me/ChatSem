@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"chatsem/services/chat/internal/middleware"
+	"chatsem/services/chat/internal/ports"
 	"chatsem/services/chat/internal/service"
-	"chatsem/shared/domain"
 	"chatsem/shared/pkg/longpoll"
 	"chatsem/shared/pkg/response"
 
@@ -19,8 +19,8 @@ func NewRouter(
 	jwtSecret string,
 	chatSvc *service.ChatService,
 	msgSvc *service.MessageService,
-	eventRepo domain.EventRepository,
-	msgRepo domain.MessageRepository,
+	eventRepo ports.EventRepository,
+	msgRepo ports.MessageRepository,
 	broker longpoll.Broker,
 	rdb *redis.Client,
 ) http.Handler {

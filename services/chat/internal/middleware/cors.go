@@ -4,14 +4,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"chatsem/shared/domain"
+	"chatsem/services/chat/internal/ports"
 
 	"github.com/google/uuid"
 )
 
 // CORS returns a middleware that enforces per-event allowed origins.
 // Wildcard "*" is never sent — incompatible with credentials=true.
-func CORS(eventRepo domain.EventRepository) func(http.Handler) http.Handler {
+func CORS(eventRepo ports.EventRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
@@ -51,7 +51,7 @@ func CORS(eventRepo domain.EventRepository) func(http.Handler) http.Handler {
 	}
 }
 
-func allowedOriginForEvent(r *http.Request, repo domain.EventRepository, eventID uuid.UUID) string {
+func allowedOriginForEvent(r *http.Request, repo ports.EventRepository, eventID uuid.UUID) string {
 	event, err := repo.GetByID(r.Context(), eventID)
 	if err != nil {
 		slog.Warn("[CORSMiddleware] could not load event", "event_id", eventID, "err", err)

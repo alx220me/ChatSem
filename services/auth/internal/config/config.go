@@ -9,7 +9,7 @@ import (
 // Config holds all runtime configuration for the auth service.
 type Config struct {
 	Addr        string        // HTTP listen address, e.g. ":8081"
-	DatabaseURL string        // PostgreSQL DSN
+	DatabaseURL string        // PostgreSQL connection string
 	RedisAddr   string        // Redis address (for session storage)
 	JWTSecret   string        // HMAC secret for JWT signing and validation
 	JWTMaxTTL   time.Duration // Maximum token lifetime
@@ -23,7 +23,7 @@ func Load() *Config {
 	}
 	cfg := &Config{
 		Addr:        getenv("AUTH_ADDR", ":8081"),
-		DatabaseURL: getenv("DATABASE_URL", "postgres://localhost:5432/chatsem?sslmode=disable"),
+		DatabaseURL: getenv("DATABASE_URL", "postgres://chatsem:chatsem@localhost:5432/chatsem"),
 		RedisAddr:   getenv("REDIS_ADDR", "localhost:6379"),
 		JWTSecret:   getenv("JWT_SECRET", "change-me-in-production"),
 		JWTMaxTTL:   ttl,

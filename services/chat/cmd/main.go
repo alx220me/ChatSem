@@ -12,10 +12,10 @@ import (
 	"chatsem/services/chat/internal/broker"
 	"chatsem/services/chat/internal/config"
 	"chatsem/services/chat/internal/handler"
-	"chatsem/services/chat/internal/repository/postgres"
+	chatpostgres "chatsem/services/chat/internal/repository/postgres"
 	"chatsem/services/chat/internal/service"
+	"chatsem/shared/pkg/postgres"
 
-	pgx "github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -48,19 +48,18 @@ func main() {
 	slog.Debug("broker: initialized")
 
 	// Database pool
-	pool, err := pgx.New(context.Background(), cfg.DatabaseURL)
+	pool, err := postgres.NewPool(context.Background(), cfg.DatabaseURL)
 	if err != nil {
 		slog.Error("database: connection failed", "err", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
-	slog.Debug("database: connected")
 
 	// Repositories and services
-	chatRepo := postgres.NewChatRepo(pool)
-	eventRepo := postgres.NewEventRepo(pool)
-	msgRepo := postgres.NewMessageRepo(pool)
-	muteRepo := postgres.NewMuteRepo(pool)
+	chatRepo := chatpostgres.NewChatRepo(pool)
+	eventRepo := chatpostgres.NewEventRepo(pool)
+	msgRepo := chatpostgres.NewMessageRepo(pool)
+	muteRepo := chatpostgres.NewMuteRepo(pool)
 	chatSvc := service.NewChatService(chatRepo)
 	msgSvc := service.NewMessageService(msgRepo, muteRepo, b, rdb)
 

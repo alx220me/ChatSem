@@ -29,7 +29,7 @@ ChatSem/
 │   ├── chat/                       # Chat service :8080
 │   │   ├── cmd/main.go             # Entry point + DI
 │   │   ├── internal/
-│   │   │   ├── domain/             # Entities + interfaces
+│   │   │   ├── ports/              # Repository interfaces (at point of use)
 │   │   │   ├── service/            # Business logic
 │   │   │   ├── repository/postgres/
 │   │   │   ├── handler/            # chi HTTP handlers
@@ -38,7 +38,7 @@ ChatSem/
 │   ├── auth/                       # Auth service :8081
 │   │   ├── cmd/main.go
 │   │   ├── internal/
-│   │   │   ├── domain/
+│   │   │   ├── ports/              # Repository interfaces (at point of use)
 │   │   │   ├── service/
 │   │   │   ├── repository/postgres/
 │   │   │   └── handler/
@@ -46,14 +46,15 @@ ChatSem/
 │   └── admin/                      # Admin service :8082
 │       ├── cmd/main.go
 │       ├── internal/
-│       │   ├── domain/
+│       │   ├── ports/              # Repository interfaces (at point of use)
 │       │   ├── service/
 │       │   ├── repository/postgres/
 │       │   └── handler/
 │       └── go.mod
 ├── shared/                         # Shared pure-Go (no pgx/Redis/chi)
-│   ├── domain/                     # Base types: Chat, Message, User, Event
+│   ├── domain/                     # Domain entities only: Chat, Message, User, Event, errors
 │   └── pkg/
+│       ├── postgres/               # Shared pgxpool.Pool factory (NewPool)
 │       ├── longpoll/               # Redis long polling broker
 │       ├── jwt/                    # JWT helpers
 │       └── response/               # Standard HTTP error format
@@ -87,7 +88,8 @@ ChatSem/
 | `services/chat/cmd/main.go` | Chat service bootstrap |
 | `services/auth/cmd/main.go` | Auth service bootstrap |
 | `services/admin/cmd/main.go` | Admin service bootstrap |
-| `shared/domain/` | Shared domain types |
+| `shared/domain/` | Shared domain entities (Chat, Message, User, Event, errors) |
+| `shared/pkg/postgres/` | Shared DB connection pool factory |
 | `frontend/widget/src/index.tsx` | Widget entry point |
 | `frontend/admin/src/main.tsx` | Admin panel entry point |
 | `migrations/` | Database schema |
@@ -116,7 +118,8 @@ ChatSem/
 - Go: run `go vet ./...` from the service directory after changes
 - DB changes go in `migrations/` — never inline in service code
 - No ORM — raw SQL via pgx v5 only
-- `shared/` stays pure Go — no pgx, Redis, chi imports
+- `shared/domain/` содержит только сущности и ошибки — интерфейсы репозиториев живут в `internal/ports/` каждого сервиса
+- `shared/` stays pure Go — no Redis, chi imports (pgx разрешён только в `shared/pkg/postgres`)
 - Services share PostgreSQL DB — no cross-service HTTP on hot path
 - JWT validation is local via `shared/pkg/jwt`, not HTTP call to auth service
 - Frontend: widget builds to IIFE bundle; admin panel builds to SPA

@@ -73,12 +73,6 @@ func (m *pollMockMessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID
 	return nil, nil
 }
 func (m *pollMockMessageRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
-func (m *pollMockMessageRepo) GetByChatRange(ctx context.Context, chatID uuid.UUID, from, to *time.Time, limit, offset int) ([]*domain.Message, error) {
-	return nil, nil
-}
-func (m *pollMockMessageRepo) CountByChatRange(ctx context.Context, chatID uuid.UUID, from, to *time.Time) (int64, error) {
-	return 0, nil
-}
 
 // buildPollRoute wraps PollHandler in Auth middleware and chi router for testing.
 func buildPollRoute(pollH *handler.PollHandler) http.Handler {
@@ -102,7 +96,7 @@ func TestPoll_ReceivesMessage(t *testing.T) {
 		},
 	}
 
-	pollH := handler.NewPollHandler(broker, msgRepo)
+	pollH := handler.NewPollHandler(broker, msgRepo, nil)
 	srv := buildPollRoute(pollH)
 
 	// Publish a message after a small delay so the poll handler is already waiting.
@@ -141,7 +135,7 @@ func TestPoll_Timeout(t *testing.T) {
 	msgRepo := &pollMockMessageRepo{}
 
 	// Override timeout via short test — we'll use a very short timeout via context.
-	pollH := handler.NewPollHandler(broker, msgRepo)
+	pollH := handler.NewPollHandler(broker, msgRepo, nil)
 	srv := buildPollRoute(pollH)
 
 	// Use a request context that cancels before LongPollTimeout.
@@ -168,7 +162,7 @@ func TestPoll_ClientDisconnect(t *testing.T) {
 	broker := longpoll.NewInMemoryBroker()
 	msgRepo := &pollMockMessageRepo{}
 
-	pollH := handler.NewPollHandler(broker, msgRepo)
+	pollH := handler.NewPollHandler(broker, msgRepo, nil)
 	srv := buildPollRoute(pollH)
 
 	ctx, cancel := context.WithCancel(context.Background())
