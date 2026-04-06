@@ -157,7 +157,7 @@ export function EventsPage(): React.ReactElement {
 
   function handleCreated(event: Event) {
     setEvents((prev) => [...prev, event])
-    setShowModal(false)
+    // Modal stays open to show the api_secret; user closes it via "Done"
   }
 
   return (

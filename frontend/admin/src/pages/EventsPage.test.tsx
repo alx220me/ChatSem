@@ -70,4 +70,35 @@ describe('EventsPage', () => {
       expect(screen.getByText(generatedSecret)).toBeInTheDocument()
     })
   })
+
+  it('TestCreateEvent_SecretModal_CloseOnDone: modal stays open after creation and closes on Done', async () => {
+    const generatedSecret = 'b'.repeat(64)
+    const newEvent: Event & { api_secret: string } = {
+      id: 'ev-4',
+      name: 'Done Conf',
+      allowedOrigin: 'https://d.com',
+      createdAt: '2026-01-04T00:00:00Z',
+      api_secret: generatedSecret,
+    }
+    const api = makeApi({ createEvent: vi.fn().mockResolvedValueOnce(newEvent) })
+    renderPage(api)
+
+    await waitFor(() => screen.getByText('Conference A'))
+
+    await userEvent.click(screen.getByRole('button', { name: /create event/i }))
+
+    const dialog = screen.getByRole('heading', { name: /create event/i }).closest('div')!
+    await userEvent.type(within(dialog).getByLabelText(/^name$/i), 'Done Conf')
+    await userEvent.type(within(dialog).getByLabelText(/allowed origin/i), 'https://d.com')
+    await userEvent.click(within(dialog).getByRole('button', { name: /create$/i }))
+
+    // Secret is shown — modal is still open
+    await waitFor(() => {
+      expect(screen.getByText(generatedSecret)).toBeInTheDocument()
+    })
+
+    // Clicking "Done" closes the modal
+    await userEvent.click(screen.getByRole('button', { name: /done/i }))
+    expect(screen.queryByText(generatedSecret)).not.toBeInTheDocument()
+  })
 })
