@@ -33,8 +33,8 @@ type createEventRequest struct {
 type createEventResponse struct {
 	ID            uuid.UUID `json:"id"`
 	Name          string    `json:"name"`
-	AllowedOrigin string    `json:"allowed_origin"`
-	CreatedAt     time.Time `json:"created_at"`
+	AllowedOrigin string    `json:"allowedOrigin"`
+	CreatedAt     time.Time `json:"createdAt"`
 	// APISecret is the plaintext secret shown exactly once at creation time.
 	// Store it securely — it cannot be recovered later.
 	APISecret string `json:"api_secret"`

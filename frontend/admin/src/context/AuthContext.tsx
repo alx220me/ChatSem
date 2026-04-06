@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { AdminApiClient } from '../api/adminClient'
 
 interface AuthState {
@@ -31,7 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const [state, setState] = useState<AuthState>(loadSession)
 
   const getToken = useCallback(() => state.token ?? '', [state.token])
-  const api = state.token ? new AdminApiClient('', getToken) : null
+  const api = useMemo(
+    () => (state.token ? new AdminApiClient('', getToken) : null),
+    [state.token, getToken],
+  )
 
   const login = useCallback(async (username: string, password: string) => {
     if (import.meta.env.DEV) {

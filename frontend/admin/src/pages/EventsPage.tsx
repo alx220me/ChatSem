@@ -15,6 +15,35 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  function copySecret() {
+    if (!createdSecret) return
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(createdSecret).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }).catch(() => fallbackCopy(createdSecret))
+    } else {
+      fallbackCopy(createdSecret)
+    }
+  }
+
+  function fallbackCopy(text: string) {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    try {
+      document.execCommand('copy')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } finally {
+      document.body.removeChild(ta)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -81,10 +110,10 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
               {createdSecret}
             </div>
             <button
-              onClick={() => void navigator.clipboard.writeText(createdSecret)}
+              onClick={copySecret}
               style={btnSecondaryStyle}
             >
-              Copy to clipboard
+              {copied ? 'Copied!' : 'Copy to clipboard'}
             </button>
             <button onClick={onClose} style={{ ...btnPrimaryStyle, marginLeft: 8 }}>
               Done
