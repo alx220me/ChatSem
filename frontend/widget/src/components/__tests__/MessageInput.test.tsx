@@ -5,31 +5,33 @@ import { MessageInput } from '../MessageInput'
 
 describe('MessageInput', () => {
   const onSend = vi.fn()
+  const onCancelReply = vi.fn()
 
   beforeEach(() => {
     onSend.mockClear()
+    onCancelReply.mockClear()
   })
 
   it('renders textarea and Send button', () => {
-    render(<MessageInput onSend={onSend} disabled={false} />)
+    render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     expect(screen.getByPlaceholderText('Введите сообщение...')).toBeInTheDocument()
     expect(screen.getByText('Send')).toBeInTheDocument()
   })
 
   it('renders emoji picker button', () => {
-    render(<MessageInput onSend={onSend} disabled={false} />)
+    render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     expect(screen.getByTitle('Смайлики')).toBeInTheDocument()
   })
 
   it('shows emoji picker when 😊 button is clicked', async () => {
-    render(<MessageInput onSend={onSend} disabled={false} />)
+    render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     const emojiBtn = screen.getByTitle('Смайлики')
     await userEvent.click(emojiBtn)
     expect(screen.getByText('Смайлики')).toBeInTheDocument() // category label inside picker
   })
 
   it('hides emoji picker when 😊 button is clicked again', async () => {
-    render(<MessageInput onSend={onSend} disabled={false} />)
+    render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     const emojiBtn = screen.getByTitle('Смайлики')
     // Open
     await userEvent.click(emojiBtn)
@@ -40,7 +42,7 @@ describe('MessageInput', () => {
   })
 
   it('inserts selected emoji into textarea', async () => {
-    render(<MessageInput onSend={onSend} disabled={false} />)
+    render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     const textarea = screen.getByPlaceholderText('Введите сообщение...')
     await userEvent.type(textarea, 'Привет')
 
@@ -52,18 +54,42 @@ describe('MessageInput', () => {
   })
 
   it('calls onSend with text when Send button is clicked', async () => {
-    render(<MessageInput onSend={onSend} disabled={false} />)
+    render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     const textarea = screen.getByPlaceholderText('Введите сообщение...')
     await userEvent.type(textarea, 'Тестовое сообщение')
     await userEvent.click(screen.getByText('Send'))
-    expect(onSend).toHaveBeenCalledWith('Тестовое сообщение')
+    expect(onSend).toHaveBeenCalledWith('Тестовое сообщение', undefined)
   })
 
   it('does not call onSend when disabled', async () => {
-    render(<MessageInput onSend={onSend} disabled={true} />)
+    render(<MessageInput onSend={onSend} disabled={true} onCancelReply={onCancelReply} />)
     const textarea = screen.getByPlaceholderText('Введите сообщение...')
     await userEvent.type(textarea, 'test')
     await userEvent.click(screen.getByText('Send'))
     expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it('shows reply banner when replyingTo is provided', () => {
+    const msg = { id: 'msg-1', chatId: 'c1', userId: 'u1', userName: 'Alice', text: 'Hello!', seq: 1, createdAt: '' }
+    render(<MessageInput onSend={onSend} disabled={false} replyingTo={msg} onCancelReply={onCancelReply} />)
+    expect(screen.getByText(/Alice/)).toBeInTheDocument()
+    expect(screen.getByText('Hello!')).toBeInTheDocument()
+    expect(screen.getByTitle('Отменить ответ')).toBeInTheDocument()
+  })
+
+  it('calls onCancelReply when × button is clicked', async () => {
+    const msg = { id: 'msg-1', chatId: 'c1', userId: 'u1', userName: 'Bob', text: 'Hi', seq: 2, createdAt: '' }
+    render(<MessageInput onSend={onSend} disabled={false} replyingTo={msg} onCancelReply={onCancelReply} />)
+    await userEvent.click(screen.getByTitle('Отменить ответ'))
+    expect(onCancelReply).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends with replyToId when replyingTo is set', async () => {
+    const msg = { id: 'reply-id-42', chatId: 'c1', userId: 'u1', userName: 'Carol', text: 'Quoted', seq: 5, createdAt: '' }
+    render(<MessageInput onSend={onSend} disabled={false} replyingTo={msg} onCancelReply={onCancelReply} />)
+    const textarea = screen.getByPlaceholderText('Введите сообщение...')
+    await userEvent.type(textarea, 'My reply')
+    await userEvent.click(screen.getByText('Send'))
+    expect(onSend).toHaveBeenCalledWith('My reply', 'reply-id-42')
   })
 })

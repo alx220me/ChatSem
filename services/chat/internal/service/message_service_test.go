@@ -66,7 +66,7 @@ func newSvc(msgs ports.MessageRepository, mutes ports.MuteRepository) *service.M
 
 func TestSendMessage_EmptyText(t *testing.T) {
 	svc := newSvc(&mockMessageRepo{}, &mockMuteRepo{})
-	_, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "")
+	_, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "", nil)
 	if !errors.Is(err, domain.ErrEmptyMessage) {
 		t.Errorf("[%s] expected ErrEmptyMessage, got %v", t.Name(), err)
 	}
@@ -79,7 +79,7 @@ func TestSendMessage_TooLongText(t *testing.T) {
 		long[i] = 'a'
 	}
 	svc := newSvc(&mockMessageRepo{}, &mockMuteRepo{})
-	_, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), string(long))
+	_, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), string(long), nil)
 	if !errors.Is(err, domain.ErrMessageTooLong) {
 		t.Errorf("[%s] expected ErrMessageTooLong, got %v", t.Name(), err)
 	}
@@ -97,7 +97,7 @@ func TestSendMessage_UserMuted(t *testing.T) {
 		},
 	}
 	svc := newSvc(&mockMessageRepo{}, muteRepo)
-	_, err := svc.SendMessage(context.Background(), chatID, uuid.New(), uuid.New(), "hello")
+	_, err := svc.SendMessage(context.Background(), chatID, uuid.New(), uuid.New(), "hello", nil)
 	if !errors.Is(err, domain.ErrUserMuted) {
 		t.Errorf("[%s] expected ErrUserMuted, got %v", t.Name(), err)
 	}
@@ -114,7 +114,7 @@ func TestSendMessage_Success(t *testing.T) {
 		},
 	}
 	svc := newSvc(msgRepo, &mockMuteRepo{})
-	msg, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "hello")
+	msg, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "hello", nil)
 	if err != nil {
 		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
 	}
@@ -135,7 +135,7 @@ func TestSendMessage_BrokerFailureSafe(t *testing.T) {
 	}
 	// Broker will fail because Redis is nil — service must still return the message.
 	svc := newSvc(msgRepo, &mockMuteRepo{})
-	msg, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "test")
+	msg, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "test", nil)
 	if err != nil {
 		t.Fatalf("[%s] broker failure should not propagate: %v", t.Name(), err)
 	}
@@ -143,6 +143,74 @@ func TestSendMessage_BrokerFailureSafe(t *testing.T) {
 		t.Errorf("[%s] expected message, got nil", t.Name())
 	}
 	t.Logf("[%s] assert: broker failure is fail-safe, message returned", t.Name())
+}
+
+func TestSendMessage_WithReply_Success(t *testing.T) {
+	chatID := uuid.New()
+	replyID := uuid.New()
+	replySeq := int64(7)
+
+	msgRepo := &mockMessageRepo{
+		getByID: func(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+			if id == replyID {
+				return &domain.Message{ID: replyID, ChatID: chatID, Seq: replySeq}, nil
+			}
+			return nil, domain.ErrNotFound
+		},
+		create: func(ctx context.Context, m *domain.Message) error {
+			m.ID = uuid.New()
+			m.Seq = 10
+			m.CreatedAt = time.Now()
+			return nil
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	msg, err := svc.SendMessage(context.Background(), chatID, uuid.New(), uuid.New(), "reply text", &replyID)
+	if err != nil {
+		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
+	}
+	if msg.ReplyToID == nil || *msg.ReplyToID != replyID {
+		t.Errorf("[%s] expected ReplyToID=%s, got %v", t.Name(), replyID, msg.ReplyToID)
+	}
+	if msg.ReplyToSeq == nil || *msg.ReplyToSeq != replySeq {
+		t.Errorf("[%s] expected ReplyToSeq=%d, got %v", t.Name(), replySeq, msg.ReplyToSeq)
+	}
+	t.Logf("[%s] assert: reply message sent, reply_to_id=%s, reply_to_seq=%d", t.Name(), replyID, replySeq)
+}
+
+func TestSendMessage_WithReply_CrossChat(t *testing.T) {
+	chatID := uuid.New()
+	otherChatID := uuid.New()
+	replyID := uuid.New()
+
+	msgRepo := &mockMessageRepo{
+		getByID: func(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+			// reply message belongs to a different chat
+			return &domain.Message{ID: replyID, ChatID: otherChatID, Seq: 1}, nil
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	_, err := svc.SendMessage(context.Background(), chatID, uuid.New(), uuid.New(), "text", &replyID)
+	if !errors.Is(err, domain.ErrInvalidReply) {
+		t.Errorf("[%s] expected ErrInvalidReply, got %v", t.Name(), err)
+	}
+	t.Logf("[%s] assert: cross-chat reply → ErrInvalidReply", t.Name())
+}
+
+func TestSendMessage_WithReply_NotFound(t *testing.T) {
+	replyID := uuid.New()
+
+	msgRepo := &mockMessageRepo{
+		getByID: func(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	_, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), uuid.New(), "text", &replyID)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("[%s] expected ErrNotFound, got %v", t.Name(), err)
+	}
+	t.Logf("[%s] assert: reply not found → ErrNotFound", t.Name())
 }
 
 func TestSoftDelete_OwnerCanDelete(t *testing.T) {
