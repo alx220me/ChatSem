@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { WidgetConfig } from '../../types'
 import type { ApiClient } from '../../api/client'
@@ -110,7 +110,7 @@ describe('ChatWindow — floating mode collapsed', () => {
     expect(screen.queryByTestId('chat-window-floating')).toBeNull()
   })
 
-  it('FAB has online-count badge when count > 0', () => {
+  it('FAB shows online count when count > 0', () => {
     render(
       <ChatWindow
         config={makeConfig({ floating: true, defaultCollapsed: true })}
@@ -118,10 +118,8 @@ describe('ChatWindow — floating mode collapsed', () => {
       />,
     )
     const fab = screen.getByTestId('chat-fab')
-    // useOnline mock returns 3, badge should be visible
-    const badge = fab.querySelector('span')
-    expect(badge).not.toBeNull()
-    expect(badge?.textContent).toBe('3')
+    // useOnline mock returns 3 — the number should appear somewhere inside the FAB
+    expect(fab.textContent).toContain('3')
   })
 
   it('expands to full window when FAB is clicked', async () => {

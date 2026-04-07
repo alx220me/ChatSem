@@ -5,6 +5,7 @@ import { useChat } from '../hooks/useChat'
 import { useLongPoll } from '../hooks/useLongPoll'
 import { useOnline } from '../hooks/useOnline'
 import { useDrag } from '../hooks/useDrag'
+import { useResize } from '../hooks/useResize'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 
@@ -33,6 +34,9 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   // Floating widget state — only active when config.floating === true
   const [collapsed, setCollapsed] = useState(config.defaultCollapsed ?? false)
   const { pos, isDragging, dragHandlers } = useDrag(config.defaultPosition)
+  const { size, isResizing, getHandlers: getResizeHandlers } = useResize(
+    config.defaultSize ?? { w: 360, h: 520 },
+  )
 
   const handleExpand = useCallback(() => {
     if (!isDragging) {
@@ -216,31 +220,28 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     [chat, sendMessage, replyingTo],
   )
 
-  // ─── Floating: collapsed FAB ────────────────────────────────────────────
+  // ─── Floating: collapsed FAB ─────────────────────────────────────────────
+  // FAB is always anchored to bottom-right — no drag, no dynamic position.
   if (config.floating && collapsed) {
-    const fabPos: React.CSSProperties = pos
-      ? { left: pos.x, top: pos.y }
-      : { right: 20, bottom: 20 }
-
     return (
       <div
         role="button"
-        aria-label="Open chat"
+        aria-label="Открыть чат"
         data-testid="chat-fab"
         onClick={handleExpand}
-        {...dragHandlers}
         style={{
           position: 'fixed',
-          ...fabPos,
-          width: 56,
-          height: 56,
-          borderRadius: '50%',
+          right: 20,
+          bottom: 20,
+          height: 36,
+          borderRadius: 18,
           backgroundColor: '#2563eb',
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-          cursor: isDragging ? 'grabbing' : 'pointer',
+          cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          gap: 6,
+          padding: '0 12px 0 10px',
           zIndex: 9999,
           userSelect: 'none',
           fontFamily:
@@ -248,41 +249,29 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         }}
       >
         {/* Chat bubble icon */}
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+          style={{ flexShrink: 0 }}>
           <path
             d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
             fill="white"
           />
         </svg>
 
-        {/* Online count badge */}
+        {/* Label */}
+        <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          Чат
+        </span>
+
+        {/* Online indicator */}
         {onlineCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: -4,
-              right: -4,
-              minWidth: 18,
-              height: 18,
-              borderRadius: 9,
-              backgroundColor: '#22c55e',
-              color: '#fff',
-              fontSize: 11,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0 4px',
-              border: '2px solid #fff',
-            }}
-          >
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: 3,
+            color: 'rgba(255,255,255,0.85)', fontSize: 11, whiteSpace: 'nowrap',
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              backgroundColor: '#4ade80', flexShrink: 0,
+            }} />
             {onlineCount > 99 ? '99+' : onlineCount}
           </span>
         )}
@@ -353,9 +342,10 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
 
   // ─── Floating: expanded window ───────────────────────────────────────────
   if (config.floating) {
+    // Default: open above the FAB (right-aligned, bottom = FAB height + gap)
     const windowPos: React.CSSProperties = pos
       ? { left: pos.x, top: pos.y }
-      : { right: 20, bottom: 80 }
+      : { right: 20, bottom: 72 }
 
     return (
       <div
@@ -363,8 +353,8 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         style={{
           position: 'fixed',
           ...windowPos,
-          width: 360,
-          height: 520,
+          width: size.w,
+          height: size.h,
           display: 'flex',
           flexDirection: 'column',
           fontFamily:
@@ -375,7 +365,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           overflow: 'hidden',
           boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
           zIndex: 9999,
-          userSelect: isDragging ? 'none' : undefined,
+          userSelect: isDragging || isResizing ? 'none' : undefined,
         }}
       >
         {/* Drag handle header */}
@@ -432,33 +422,80 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
               </span>
             )}
 
-            {/* Collapse button */}
+            {/* Collapse button — stopPropagation prevents header drag from swallowing the click */}
             <button
-              aria-label="Collapse chat"
+              aria-label="Свернуть чат"
+              title="Свернуть"
               data-testid="chat-collapse-btn"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={handleCollapse}
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: 4,
-                border: 'none',
-                backgroundColor: 'transparent',
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                border: '1px solid #e5e7eb',
+                backgroundColor: '#fff',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#6b7280',
-                fontSize: 16,
-                lineHeight: 1,
+                color: '#374151',
+                flexShrink: 0,
                 padding: 0,
               }}
             >
-              &#x2212;
+              {/* Chevron-down icon */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2.5"
+                  strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           </div>
         </div>
 
         {innerContent}
+
+        {/* ── Resize handles ─────────────────────────────────────────── */}
+        {/* Right edge */}
+        <div
+          {...getResizeHandlers('e')}
+          style={{
+            position: 'absolute', top: 12, right: 0, bottom: 12, width: 6,
+            cursor: 'e-resize', zIndex: 1,
+          }}
+        />
+        {/* Bottom edge */}
+        <div
+          {...getResizeHandlers('s')}
+          style={{
+            position: 'absolute', left: 12, right: 12, bottom: 0, height: 6,
+            cursor: 's-resize', zIndex: 1,
+          }}
+        />
+        {/* Bottom-right corner */}
+        <div
+          {...getResizeHandlers('se')}
+          style={{
+            position: 'absolute', right: 0, bottom: 0, width: 16, height: 16,
+            cursor: 'se-resize', zIndex: 2,
+          }}
+        />
+        {/* Bottom-left corner */}
+        <div
+          {...getResizeHandlers('sw')}
+          style={{
+            position: 'absolute', left: 0, bottom: 0, width: 16, height: 16,
+            cursor: 'sw-resize', zIndex: 2,
+          }}
+        />
+        {/* Left edge */}
+        <div
+          {...getResizeHandlers('w')}
+          style={{
+            position: 'absolute', top: 12, left: 0, bottom: 12, width: 6,
+            cursor: 'w-resize', zIndex: 1,
+          }}
+        />
       </div>
     )
   }
