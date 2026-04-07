@@ -6,6 +6,8 @@ export class HttpError extends Error {
     message: string,
     /** Seconds to wait before retrying (from Retry-After header). */
     public readonly retryAfter: number = 0,
+    /** Error code from the server response body (e.g. "banned", "forbidden"). */
+    public readonly code?: string,
   ) {
     super(message)
     this.name = 'HttpError'
@@ -72,7 +74,14 @@ export class ApiClient {
 
     if (!res.ok) {
       const retryAfter = parseInt(res.headers.get('Retry-After') ?? '0', 10) || 0
-      throw new HttpError(res.status, `HTTP ${res.status}: ${res.statusText}`, retryAfter)
+      let code: string | undefined
+      let message = `HTTP ${res.status}: ${res.statusText}`
+      try {
+        const body = await res.clone().json() as { code?: string; error?: string }
+        if (body.code) code = body.code
+        if (body.error) message = body.error
+      } catch { /* ignore parse errors */ }
+      throw new HttpError(res.status, message, retryAfter, code)
     }
 
     // 204 No Content — return empty object cast to T

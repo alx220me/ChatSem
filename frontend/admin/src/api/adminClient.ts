@@ -85,7 +85,7 @@ export class AdminApiClient {
     reason: string,
     expiresAt?: string,
   ): Promise<Ban> {
-    return this.request<Ban>('POST', '/api/admin/bans', { userId, eventId, reason, expiresAt })
+    return this.request<Ban>('POST', '/api/admin/bans', { user_id: userId, event_id: eventId, reason, expires_at: expiresAt })
   }
 
   async deleteBan(banId: string): Promise<void> {
@@ -103,7 +103,7 @@ export class AdminApiClient {
     reason: string,
     expiresAt?: string,
   ): Promise<Mute> {
-    return this.request<Mute>('POST', '/api/admin/mutes', { chatId, userId, reason, expiresAt })
+    return this.request<Mute>('POST', '/api/admin/mutes', { chat_id: chatId, user_id: userId, reason, expires_at: expiresAt })
   }
 
   async deleteMute(muteId: string): Promise<void> {

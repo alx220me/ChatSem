@@ -72,10 +72,10 @@ func (m *mockMuteRepo) IsUserMuted(ctx context.Context, userID, chatID uuid.UUID
 	return false, nil
 }
 
-// newSvc creates a MessageService with in-memory broker and nil Redis (ban check will fail-open).
+// newSvc creates a MessageService with in-memory broker, nil Redis, and nil banRepo (ban check will fail-open).
 func newSvc(msgs ports.MessageRepository, mutes ports.MuteRepository) *service.MessageService {
 	broker := longpoll.NewInMemoryBroker()
-	return service.NewMessageService(msgs, mutes, broker, nil)
+	return service.NewMessageService(msgs, mutes, nil, broker, nil)
 }
 
 func TestSendMessage_EmptyText(t *testing.T) {

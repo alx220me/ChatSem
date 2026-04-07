@@ -35,6 +35,11 @@ type MessageRepository interface {
 	Update(ctx context.Context, id uuid.UUID, newText string) error
 }
 
+// BanRepository is the minimal ban store interface needed by the chat service.
+type BanRepository interface {
+	IsUserBanned(ctx context.Context, userID, eventID uuid.UUID) (bool, error)
+}
+
 // MuteRepository is the minimal mute store interface needed by the chat service.
 type MuteRepository interface {
 	IsUserMuted(ctx context.Context, userID, chatID uuid.UUID) (bool, error)

@@ -39,7 +39,7 @@ func TestBanCheck_NotBanned_NilRedis(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := injectClaims(claims, middleware.BanCheck(nil)(inner))
+	handler := injectClaims(claims, middleware.BanCheck(nil, nil)(inner))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -57,7 +57,7 @@ func TestBanCheck_NoClaims_PassThrough(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := middleware.BanCheck(nil)(inner)
+	handler := middleware.BanCheck(nil, nil)(inner)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()

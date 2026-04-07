@@ -81,8 +81,8 @@ function BansTab({ eventId }: { eventId: string }): React.ReactElement {
         <form onSubmit={handleBan} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {formError && <div style={{ color: '#b91c1c', fontSize: 13 }}>{formError}</div>}
           <label style={labelStyle}>
-            User ID
-            <input value={userId} onChange={(e) => setUserId(e.target.value)} required style={inputStyle} />
+            User ID (internal UUID from Users page)
+            <input value={userId} onChange={(e) => setUserId(e.target.value)} required style={inputStyle} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           </label>
           <label style={labelStyle}>
             Reason
@@ -258,8 +258,8 @@ function MutesTab({ eventId }: { eventId: string }): React.ReactElement {
             </select>
           </label>
           <label style={labelStyle}>
-            User ID
-            <input value={userId} onChange={(e) => setUserId(e.target.value)} required style={inputStyle} />
+            User ID (internal UUID from Users page)
+            <input value={userId} onChange={(e) => setUserId(e.target.value)} required style={inputStyle} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           </label>
           <label style={labelStyle}>
             Reason

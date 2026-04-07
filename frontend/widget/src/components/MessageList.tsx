@@ -467,13 +467,13 @@ export function MessageList({
       {modTarget && (
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(0,0,0,0.35)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10,
+            zIndex: 10000,
           }}
           onClick={() => { setModTarget(null); setModReason('') }}
         >

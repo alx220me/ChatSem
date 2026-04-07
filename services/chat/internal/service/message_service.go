@@ -19,6 +19,7 @@ import (
 type MessageService struct {
 	messages ports.MessageRepository
 	mutes    ports.MuteRepository
+	bans     ports.BanRepository
 	broker   longpoll.Broker
 	rdb      *redis.Client
 }
@@ -27,12 +28,14 @@ type MessageService struct {
 func NewMessageService(
 	messages ports.MessageRepository,
 	mutes ports.MuteRepository,
+	bans ports.BanRepository,
 	broker longpoll.Broker,
 	rdb *redis.Client,
 ) *MessageService {
 	return &MessageService{
 		messages: messages,
 		mutes:    mutes,
+		bans:     bans,
 		broker:   broker,
 		rdb:      rdb,
 	}
@@ -51,16 +54,28 @@ func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventI
 		return nil, domain.ErrMessageTooLong
 	}
 
-	// Ban check via Redis (fast path, fail-open).
+	// Ban check: Redis fast path, DB fallback.
+	banned := false
+	banKey := fmt.Sprintf("ban:%s:%s", eventID, userID)
 	if s.rdb != nil {
-		banKey := fmt.Sprintf("ban:%s:%s", eventID, userID)
 		exists, err := s.rdb.Exists(ctx, banKey).Result()
 		if err != nil {
-			slog.Warn("[MessageService.SendMessage] redis ban check failed, failing open", "err", err)
+			slog.Warn("[MessageService.SendMessage] redis ban check failed, trying DB", "err", err)
 		} else if exists > 0 {
-			slog.Warn("[MessageService.SendMessage] user is banned", "user_id", userID, "event_id", eventID)
-			return nil, domain.ErrUserBanned
+			banned = true
 		}
+	}
+	if !banned && s.bans != nil {
+		dbBanned, err := s.bans.IsUserBanned(ctx, userID, eventID)
+		if err != nil {
+			slog.Warn("[MessageService.SendMessage] DB ban check failed, failing open", "err", err)
+		} else {
+			banned = dbBanned
+		}
+	}
+	if banned {
+		slog.Warn("[MessageService.SendMessage] user is banned", "user_id", userID, "event_id", eventID)
+		return nil, domain.ErrUserBanned
 	}
 
 	// Mute check via DB.

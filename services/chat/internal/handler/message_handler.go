@@ -70,7 +70,9 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, domain.ErrEmptyMessage), errors.Is(err, domain.ErrMessageTooLong):
 			response.Error(w, http.StatusBadRequest, "bad_request", err.Error())
-		case errors.Is(err, domain.ErrUserBanned), errors.Is(err, domain.ErrUserMuted), errors.Is(err, domain.ErrForbidden):
+		case errors.Is(err, domain.ErrUserMuted):
+			response.Error(w, http.StatusForbidden, "muted", err.Error())
+		case errors.Is(err, domain.ErrUserBanned), errors.Is(err, domain.ErrForbidden):
 			response.Error(w, http.StatusForbidden, "forbidden", err.Error())
 		case errors.Is(err, domain.ErrNotFound):
 			response.Error(w, http.StatusBadRequest, "bad_request", "reply message not found")

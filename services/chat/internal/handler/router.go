@@ -21,6 +21,7 @@ func NewRouter(
 	msgSvc *service.MessageService,
 	eventRepo ports.EventRepository,
 	msgRepo ports.MessageRepository,
+	banRepo ports.BanRepository,
 	broker longpoll.Broker,
 	rdb *redis.Client,
 ) http.Handler {
@@ -46,7 +47,7 @@ func NewRouter(
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(jwtSecret))
 		r.Use(middleware.CORS(eventRepo))
-		r.Use(middleware.BanCheck(rdb))
+		r.Use(middleware.BanCheck(rdb, banRepo))
 
 		// Chat endpoints
 		r.Post("/api/chat/join", chatH.JoinRoom)

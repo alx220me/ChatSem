@@ -64,6 +64,7 @@ export function UsersPage(): React.ReactElement {
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>
                 <th style={thStyle}>External ID</th>
                 <th style={thStyle}>Name</th>
+                <th style={thStyle}>Internal ID</th>
                 <th style={thStyle}>Role</th>
               </tr>
             </thead>
@@ -72,6 +73,7 @@ export function UsersPage(): React.ReactElement {
                 <tr key={user.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={tdStyle}>{user.externalId}</td>
                   <td style={tdStyle}>{user.name}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 11, color: '#6b7280' }}>{user.id}</td>
                   <td style={tdStyle}>
                     <select
                       value={user.role}
@@ -96,7 +98,7 @@ export function UsersPage(): React.ReactElement {
               {users.length === 0 && (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={4}
                     style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 32 }}
                   >
                     No users found

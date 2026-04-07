@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ApiClient } from '../api/client'
+import { HttpError } from '../api/client'
 import type { Chat, Message, SendResponse } from '../types'
 
 interface UseChatResult {
@@ -64,9 +65,13 @@ export function useChat(
         setInitialHasMore(result.has_more)
       } catch (err) {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : String(err)
-        setError(msg)
-        console.warn('[useChat] init error', msg)
+        if (err instanceof HttpError && err.code === 'banned') {
+          setError('banned')
+        } else {
+          const msg = err instanceof Error ? err.message : String(err)
+          setError(msg)
+        }
+        console.warn('[useChat] init error', err instanceof Error ? err.message : String(err))
       } finally {
         if (!cancelled) setLoading(false)
       }

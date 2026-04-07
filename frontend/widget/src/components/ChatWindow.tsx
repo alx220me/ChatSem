@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { HttpError } from '../api/client'
 import type { ApiClient } from '../api/client'
 import type { Message, EditedMessage, WidgetConfig } from '../types'
 import { useChat } from '../hooks/useChat'
@@ -8,6 +9,8 @@ import { useDrag } from '../hooks/useDrag'
 import { useResize } from '../hooks/useResize'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { Toast } from './Toast'
+import type { ToastState } from './Toast'
 
 interface ChatWindowProps {
   config: WidgetConfig
@@ -28,6 +31,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [toast, setToast] = useState<ToastState | null>(null)
   const [scrollToBottomTrigger, setScrollToBottomTrigger] = useState(0)
   const allMessagesRef = useRef(allMessages)
   useEffect(() => { allMessagesRef.current = allMessages }, [allMessages])
@@ -160,8 +164,10 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     async (userId: string, reason: string) => {
       try {
         await api.banUser(userId, config.eventId, reason)
+        setToast({ message: 'Пользователь заблокирован', variant: 'success' })
       } catch (err) {
         console.warn('[ChatWindow] ban failed', err)
+        setToast({ message: 'Не удалось заблокировать', variant: 'error' })
       }
     },
     [api, config.eventId],
@@ -172,8 +178,10 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
       if (!chat) return
       try {
         await api.muteUser(userId, chat.id, reason)
+        setToast({ message: 'Пользователь замьючен', variant: 'success' })
       } catch (err) {
         console.warn('[ChatWindow] mute failed', err)
+        setToast({ message: 'Не удалось замьютить', variant: 'error' })
       }
     },
     [api, chat],
@@ -215,6 +223,10 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
       } catch (err) {
         // Remove optimistic message on failure
         setAllMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+        if (err instanceof HttpError && err.code === 'muted') {
+          setToast({ message: 'Вы замьючены в этом чате', variant: 'error' })
+          return
+        }
         throw err
       }
     },
@@ -330,14 +342,27 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           style={{
             flex: 1,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#b91c1c',
-            fontSize: 14,
-            padding: 20,
+            gap: 8,
+            padding: 24,
+            textAlign: 'center',
           }}
         >
-          {error}
+          {error === 'banned' ? (
+            <>
+              <span style={{ fontSize: 32 }}>🚫</span>
+              <span style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>
+                Доступ ограничен
+              </span>
+              <span style={{ fontSize: 13, color: '#6b7280' }}>
+                Вы заблокированы в этом мероприятии
+              </span>
+            </>
+          ) : (
+            <span style={{ color: '#b91c1c', fontSize: 14 }}>{error}</span>
+          )}
         </div>
       )}
 
@@ -522,6 +547,8 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             cursor: 'w-resize', zIndex: 1,
           }}
         />
+
+        <Toast state={toast} onDismiss={() => setToast(null)} />
       </div>
     )
   }
@@ -593,6 +620,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
       </div>
 
       {innerContent}
+      <Toast state={toast} onDismiss={() => setToast(null)} />
     </div>
   )
 }
