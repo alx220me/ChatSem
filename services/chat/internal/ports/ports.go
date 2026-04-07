@@ -31,6 +31,7 @@ type MessageRepository interface {
 	GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error)
 	ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error
+	Update(ctx context.Context, id uuid.UUID, newText string) error
 }
 
 // MuteRepository is the minimal mute store interface needed by the chat service.

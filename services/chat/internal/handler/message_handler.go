@@ -168,3 +168,59 @@ func (h *MessageHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type editMessageRequest struct {
+	Text string `json:"text"`
+}
+
+// Edit handles PATCH /api/chat/messages/{msgID}.
+// Only the message owner can edit; moderators and admins cannot.
+func (h *MessageHandler) Edit(w http.ResponseWriter, r *http.Request) {
+	rawMsgID := chi.URLParam(r, "msgID")
+	msgID, err := uuid.Parse(rawMsgID)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "bad_request", "invalid msg_id")
+		return
+	}
+
+	claims, ok := middleware.ClaimsFromCtx(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "unauthorized", "missing claims")
+		return
+	}
+
+	var req editMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+
+	slog.Debug("[MessageHandler.Edit] request", "msg_id", msgID, "user_id", claims.UserID, "text_len", len(req.Text))
+	updated, err := h.svc.EditMessage(r.Context(), msgID, claims.UserID, req.Text)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrEmptyMessage), errors.Is(err, domain.ErrMessageTooLong):
+			response.Error(w, http.StatusBadRequest, "bad_request", err.Error())
+		case errors.Is(err, domain.ErrEditForbidden):
+			response.Error(w, http.StatusForbidden, "forbidden", err.Error())
+		case errors.Is(err, domain.ErrNotFound):
+			response.Error(w, http.StatusNotFound, "not_found", "message not found")
+		default:
+			slog.Warn("[MessageHandler.Edit] error", "err", err)
+			response.Error(w, http.StatusInternalServerError, "internal_error", "failed to edit message")
+		}
+		return
+	}
+
+	slog.Info("[MessageHandler.Edit] edited", "msg_id", msgID, "by", claims.UserID)
+
+	editedAt := ""
+	if updated.EditedAt != nil {
+		editedAt = updated.EditedAt.UTC().Format("2006-01-02T15:04:05Z07:00")
+	}
+	response.JSON(w, http.StatusOK, map[string]interface{}{
+		"id":        updated.ID,
+		"text":      updated.Text,
+		"edited_at": editedAt,
+	})
+}

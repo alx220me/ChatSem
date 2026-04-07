@@ -55,6 +55,7 @@ func NewRouter(
 		// Message endpoints
 		r.Get("/api/chat/{chatID}/messages", msgH.List)
 		r.Delete("/api/chat/messages/{msgID}", msgH.Delete)
+		r.Patch("/api/chat/messages/{msgID}", msgH.Edit)
 
 		// Message send with rate limit
 		r.Group(func(r chi.Router) {

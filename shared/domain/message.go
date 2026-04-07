@@ -16,6 +16,7 @@ type Message struct {
 	Seq       int64      `json:"seq"`
 	CreatedAt time.Time  `json:"createdAt"`
 	DeletedAt *time.Time `json:"deletedAt,omitempty"` // soft delete
+	EditedAt  *time.Time `json:"editedAt,omitempty"`  // set when message was edited
 
 	// Reply fields — populated via LEFT JOIN in the repository; not stored as separate columns.
 	ReplyToID       *uuid.UUID `json:"replyToId,omitempty"`

@@ -14,4 +14,5 @@ var (
 	ErrInvalidSecret   = errors.New("invalid api secret")
 	ErrInvalidRole     = errors.New("invalid role")
 	ErrInvalidReply    = errors.New("reply message does not belong to this chat")
+	ErrEditForbidden   = errors.New("only the message owner can edit")
 )

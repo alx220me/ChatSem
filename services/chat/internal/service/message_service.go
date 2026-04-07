@@ -195,3 +195,82 @@ func (s *MessageService) SoftDelete(ctx context.Context, msgID, requestorID uuid
 
 	return nil
 }
+
+// EditMessage updates the text of a message. Only the original author can edit.
+// On success it records the edit in a Redis sorted set (edit_log) so long-poll
+// clients can pick up the change, and publishes to the broker to wake waiters.
+func (s *MessageService) EditMessage(ctx context.Context, msgID, requestorID uuid.UUID, newText string) (*domain.Message, error) {
+	slog.Debug("[MessageService.EditMessage] editing", "msg_id", msgID, "by", requestorID)
+
+	if len(newText) == 0 {
+		return nil, domain.ErrEmptyMessage
+	}
+	if len(newText) > 4096 {
+		return nil, domain.ErrMessageTooLong
+	}
+
+	msg, err := s.messages.GetByID(ctx, msgID)
+	if err != nil {
+		slog.Warn("[MessageService.EditMessage] message not found", "msg_id", msgID, "err", err)
+		return nil, domain.ErrNotFound
+	}
+
+	if msg.UserID != requestorID {
+		slog.Warn("[MessageService.EditMessage] forbidden — not owner",
+			"msg_id", msgID, "owner", msg.UserID, "requestor", requestorID)
+		return nil, domain.ErrEditForbidden
+	}
+
+	if err := s.messages.Update(ctx, msgID, newText); err != nil {
+		return nil, fmt.Errorf("MessageService.EditMessage update: %w", err)
+	}
+
+	// Reload to get the server-assigned edited_at timestamp.
+	updated, err := s.messages.GetByID(ctx, msgID)
+	if err != nil {
+		return nil, fmt.Errorf("MessageService.EditMessage reload: %w", err)
+	}
+
+	slog.Info("[MessageService.EditMessage] edited", "msg_id", msgID, "by", requestorID)
+
+	// Track edit in Redis edit_log so polling clients can receive the change.
+	if s.rdb != nil {
+		counterKey := fmt.Sprintf("chat:%s:edit_seq", updated.ChatID)
+		logKey := fmt.Sprintf("chat:%s:edit_log", updated.ChatID)
+
+		type editEntry struct {
+			ID       string `json:"id"`
+			Text     string `json:"text"`
+			EditedAt string `json:"edited_at"`
+		}
+		entry := editEntry{
+			ID:   updated.ID.String(),
+			Text: updated.Text,
+		}
+		if updated.EditedAt != nil {
+			entry.EditedAt = updated.EditedAt.UTC().Format("2006-01-02T15:04:05Z07:00")
+		}
+		member, marshalErr := json.Marshal(entry)
+		if marshalErr == nil {
+			editSeq, incrErr := s.rdb.Incr(ctx, counterKey).Result()
+			if incrErr == nil {
+				pipe := s.rdb.Pipeline()
+				pipe.ZAdd(ctx, logKey, redis.Z{Score: float64(editSeq), Member: string(member)})
+				pipe.Expire(ctx, counterKey, time.Hour)
+				pipe.Expire(ctx, logKey, time.Hour)
+				if _, pipeErr := pipe.Exec(ctx); pipeErr != nil {
+					slog.Warn("[MessageService.EditMessage] redis edit_log update failed", "err", pipeErr)
+				}
+			} else {
+				slog.Warn("[MessageService.EditMessage] redis edit_seq incr failed", "err", incrErr)
+			}
+		}
+	}
+
+	// Publish to broker to wake long-poll waiters.
+	if publishErr := s.broker.Publish(ctx, updated.ChatID, []byte(`{"type":"edit"}`)); publishErr != nil {
+		slog.Warn("[MessageService.EditMessage] broker publish failed", "err", publishErr)
+	}
+
+	return updated, nil
+}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -46,6 +47,18 @@ func deleteSeqKey(chatID uuid.UUID) string {
 	return fmt.Sprintf("chat:%s:delete_seq", chatID)
 }
 
+// editLogKey returns the Redis sorted-set key for edit events of a chat.
+func editLogKey(chatID uuid.UUID) string {
+	return fmt.Sprintf("chat:%s:edit_log", chatID)
+}
+
+// editEntry is a single element stored in the Redis edit_log sorted set.
+type editEntry struct {
+	ID       string `json:"id"`
+	Text     string `json:"text"`
+	EditedAt string `json:"edited_at"`
+}
+
 // fetchDeletesSince returns deleted message IDs with delete_seq > afterDeleteSeq,
 // and the maximum delete_seq seen (0 if nothing returned).
 func fetchDeletesSince(ctx context.Context, rdb *redis.Client, chatID uuid.UUID, afterDeleteSeq int64) (ids []string, maxSeq int64) {
@@ -67,6 +80,34 @@ func fetchDeletesSince(ctx context.Context, rdb *redis.Client, chatID uuid.UUID,
 		}
 	}
 	return ids, maxSeq
+}
+
+// fetchEditsSince returns edited message entries with edit_seq > afterEditSeq,
+// and the maximum edit_seq seen (0 if nothing returned).
+func fetchEditsSince(ctx context.Context, rdb *redis.Client, chatID uuid.UUID, afterEditSeq int64) (entries []editEntry, maxSeq int64) {
+	if rdb == nil {
+		return nil, 0
+	}
+	results, err := rdb.ZRangeByScoreWithScores(ctx, editLogKey(chatID), &redis.ZRangeBy{
+		Min: fmt.Sprintf("(%d", afterEditSeq),
+		Max: "+inf",
+	}).Result()
+	if err != nil || len(results) == 0 {
+		return nil, 0
+	}
+	entries = make([]editEntry, 0, len(results))
+	for _, z := range results {
+		var e editEntry
+		if jsonErr := json.Unmarshal([]byte(z.Member.(string)), &e); jsonErr != nil {
+			slog.Warn("[PollHandler] fetchEditsSince: failed to unmarshal edit entry", "err", jsonErr)
+			continue
+		}
+		entries = append(entries, e)
+		if int64(z.Score) > maxSeq {
+			maxSeq = int64(z.Score)
+		}
+	}
+	return entries, maxSeq
 }
 
 // Poll handles GET /api/chat/{chatID}/poll?after={seq}.
@@ -96,19 +137,33 @@ func (h *PollHandler) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	afterEditSeq := int64(0)
+	if s := r.URL.Query().Get("after_edit_seq"); s != "" {
+		afterEditSeq, err = strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			response.Error(w, http.StatusBadRequest, "bad_request", "invalid after_edit_seq parameter")
+			return
+		}
+	}
+
 	claims, ok := middleware.ClaimsFromCtx(r.Context())
 	if !ok {
 		response.Error(w, http.StatusUnauthorized, "unauthorized", "missing claims")
 		return
 	}
 
-	slog.Debug("[PollHandler.Poll] waiting", "chat_id", chatID, "after_seq", afterSeq, "after_delete_seq", afterDeleteSeq, "user_id", claims.UserID)
+	slog.Debug("[PollHandler.Poll] waiting",
+		"chat_id", chatID, "after_seq", afterSeq,
+		"after_delete_seq", afterDeleteSeq, "after_edit_seq", afterEditSeq,
+		"user_id", claims.UserID)
 
 	// pollResult bundles the response payload.
 	type pollResult struct {
 		msgs           []*domain.Message
 		deletedIDs     []string
 		lastDeleteSeq  int64
+		editedMessages []editEntry
+		lastEditSeq    int64
 	}
 
 	buildResult := func(ctx context.Context) *pollResult {
@@ -122,7 +177,17 @@ func (h *PollHandler) Poll(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		deletedIDs, lastDeleteSeq := fetchDeletesSince(ctx, h.rdb, chatID, afterDeleteSeq)
-		return &pollResult{msgs: msgs, deletedIDs: deletedIDs, lastDeleteSeq: lastDeleteSeq}
+		editedMessages, lastEditSeq := fetchEditsSince(ctx, h.rdb, chatID, afterEditSeq)
+		if len(editedMessages) > 0 {
+			slog.Debug("[PollHandler.Poll] edits found", "chat_id", chatID, "count", len(editedMessages))
+		}
+		return &pollResult{
+			msgs:           msgs,
+			deletedIDs:     deletedIDs,
+			lastDeleteSeq:  lastDeleteSeq,
+			editedMessages: editedMessages,
+			lastEditSeq:    lastEditSeq,
+		}
 	}
 
 	// Fast path: if there is already something to deliver, return immediately.
@@ -130,18 +195,22 @@ func (h *PollHandler) Poll(w http.ResponseWriter, r *http.Request) {
 		fastCtx, fastCancel := context.WithTimeout(context.Background(), 3*time.Second)
 		res := buildResult(fastCtx)
 		fastCancel()
-		if len(res.msgs) > 0 || len(res.deletedIDs) > 0 {
-			slog.Info("[PollHandler.Poll] fast-path: returning data", "chat_id", chatID, "msgs", len(res.msgs), "deletes", len(res.deletedIDs))
+		if len(res.msgs) > 0 || len(res.deletedIDs) > 0 || len(res.editedMessages) > 0 {
+			slog.Info("[PollHandler.Poll] fast-path: returning data",
+				"chat_id", chatID, "msgs", len(res.msgs),
+				"deletes", len(res.deletedIDs), "edits", len(res.editedMessages))
 			response.JSON(w, http.StatusOK, map[string]interface{}{
-				"messages":        res.msgs,
-				"deleted_ids":     res.deletedIDs,
-				"last_delete_seq": res.lastDeleteSeq,
+				"messages":         res.msgs,
+				"deleted_ids":      res.deletedIDs,
+				"last_delete_seq":  res.lastDeleteSeq,
+				"edited_messages":  res.editedMessages,
+				"last_edit_seq":    res.lastEditSeq,
 			})
 			return
 		}
 	}
 
-	// Slow path: subscribe to broker and wait for new message/deletion or timeout.
+	// Slow path: subscribe to broker and wait for new message/deletion/edit or timeout.
 	ch := h.broker.Subscribe(chatID)
 	defer h.broker.Unsubscribe(chatID, ch)
 
@@ -171,16 +240,21 @@ func (h *PollHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deletedIDs, lastDeleteSeq := fetchDeletesSince(dbCtx, h.rdb, chatID, afterDeleteSeq)
+	editedMessages, lastEditSeq := fetchEditsSince(dbCtx, h.rdb, chatID, afterEditSeq)
 
-	if len(msgs) == 0 && len(deletedIDs) == 0 {
+	if len(msgs) == 0 && len(deletedIDs) == 0 && len(editedMessages) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	slog.Info("[PollHandler.Poll] returning data", "chat_id", chatID, "msgs", len(msgs), "deletes", len(deletedIDs))
+	slog.Info("[PollHandler.Poll] returning data",
+		"chat_id", chatID, "msgs", len(msgs),
+		"deletes", len(deletedIDs), "edits", len(editedMessages))
 	response.JSON(w, http.StatusOK, map[string]interface{}{
 		"messages":        msgs,
 		"deleted_ids":     deletedIDs,
 		"last_delete_seq": lastDeleteSeq,
+		"edited_messages": editedMessages,
+		"last_edit_seq":   lastEditSeq,
 	})
 }
