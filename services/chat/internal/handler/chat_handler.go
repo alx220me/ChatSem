@@ -53,6 +53,12 @@ func (h *ChatHandler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if eventID != claims.EventID {
+		slog.Warn("[ChatHandler.JoinRoom] event_id mismatch", "token_event_id", claims.EventID, "req_event_id", eventID, "user_id", claims.UserID)
+		response.Error(w, http.StatusForbidden, "forbidden", "token event_id does not match requested event")
+		return
+	}
+
 	slog.Debug("[ChatHandler.JoinRoom] request", "event_id", eventID, "room_id", req.RoomID, "user_id", claims.UserID)
 
 	result, err := h.svc.GetOrCreateChildChat(r.Context(), eventID, req.RoomID)

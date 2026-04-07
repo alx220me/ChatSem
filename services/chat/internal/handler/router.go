@@ -52,28 +52,36 @@ func NewRouter(
 		r.Post("/api/chat/join", chatH.JoinRoom)
 		r.Get("/api/chat/chats/{chatID}", chatH.GetChat)
 
-		// Message endpoints
-		r.Get("/api/chat/{chatID}/messages", msgH.List)
+		// chatID-scoped endpoints: enforce that the chat belongs to the token's event.
+		onlineH := NewOnlineHandler(rdb)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.EventOwnership(chatSvc))
+
+			// Message endpoints
+			r.Get("/api/chat/{chatID}/messages", msgH.List)
+
+			// Message send with rate limit
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.MessageRateLimit(rdb))
+				r.Post("/api/chat/{chatID}/messages", msgH.Send)
+			})
+
+			// Long poll with per-IP rate limit
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.PollIPRateLimit(rdb))
+				r.Get("/api/chat/{chatID}/poll", pollH.Poll)
+			})
+
+			// Online presence
+			r.Post("/api/chat/{chatID}/heartbeat", onlineH.Heartbeat)
+			r.Delete("/api/chat/{chatID}/heartbeat", onlineH.Leave)
+			r.Get("/api/chat/{chatID}/online", onlineH.OnlineCount)
+		})
+
+		// Message-level endpoints (by msgID, not chatID) — no ownership middleware needed here
+		// since ownership is enforced at send/join level; moderator actions are role-checked.
 		r.Delete("/api/chat/messages/{msgID}", msgH.Delete)
 		r.Patch("/api/chat/messages/{msgID}", msgH.Edit)
-
-		// Message send with rate limit
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.MessageRateLimit(rdb))
-			r.Post("/api/chat/{chatID}/messages", msgH.Send)
-		})
-
-		// Long poll with per-IP rate limit
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.PollIPRateLimit(rdb))
-			r.Get("/api/chat/{chatID}/poll", pollH.Poll)
-		})
-
-		// Online presence
-		onlineH := NewOnlineHandler(rdb)
-		r.Post("/api/chat/{chatID}/heartbeat", onlineH.Heartbeat)
-		r.Delete("/api/chat/{chatID}/heartbeat", onlineH.Leave)
-		r.Get("/api/chat/{chatID}/online", onlineH.OnlineCount)
 	})
 
 	return r
