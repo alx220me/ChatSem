@@ -12,10 +12,10 @@ describe('MessageInput', () => {
     onCancelReply.mockClear()
   })
 
-  it('renders textarea and Send button', () => {
+  it('renders textarea and send button', () => {
     render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     expect(screen.getByPlaceholderText('Введите сообщение...')).toBeInTheDocument()
-    expect(screen.getByText('Send')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Отправить' })).toBeInTheDocument()
   })
 
   it('renders emoji picker button', () => {
@@ -57,7 +57,7 @@ describe('MessageInput', () => {
     render(<MessageInput onSend={onSend} disabled={false} onCancelReply={onCancelReply} />)
     const textarea = screen.getByPlaceholderText('Введите сообщение...')
     await userEvent.type(textarea, 'Тестовое сообщение')
-    await userEvent.click(screen.getByText('Send'))
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить' }))
     expect(onSend).toHaveBeenCalledWith('Тестовое сообщение', undefined)
   })
 
@@ -65,7 +65,7 @@ describe('MessageInput', () => {
     render(<MessageInput onSend={onSend} disabled={true} onCancelReply={onCancelReply} />)
     const textarea = screen.getByPlaceholderText('Введите сообщение...')
     await userEvent.type(textarea, 'test')
-    await userEvent.click(screen.getByText('Send'))
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить' }))
     expect(onSend).not.toHaveBeenCalled()
   })
 
@@ -89,7 +89,7 @@ describe('MessageInput', () => {
     render(<MessageInput onSend={onSend} disabled={false} replyingTo={msg} onCancelReply={onCancelReply} />)
     const textarea = screen.getByPlaceholderText('Введите сообщение...')
     await userEvent.type(textarea, 'My reply')
-    await userEvent.click(screen.getByText('Send'))
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить' }))
     expect(onSend).toHaveBeenCalledWith('My reply', 'reply-id-42')
   })
 })

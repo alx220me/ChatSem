@@ -9,6 +9,9 @@ const releasePointerCapture = vi.fn()
 beforeEach(() => {
   setPointerCapture.mockClear()
   releasePointerCapture.mockClear()
+  // Large viewport so clamping doesn't interfere with position assertions.
+  Object.defineProperty(window, 'innerWidth', { value: 4000, configurable: true })
+  Object.defineProperty(window, 'innerHeight', { value: 4000, configurable: true })
 })
 
 function makePointerEvent(overrides: Partial<PointerEvent> = {}): React.PointerEvent {
@@ -17,7 +20,11 @@ function makePointerEvent(overrides: Partial<PointerEvent> = {}): React.PointerE
     clientX: 0,
     clientY: 0,
     preventDefault: vi.fn(),
-    currentTarget: { setPointerCapture, releasePointerCapture } as unknown as EventTarget,
+    currentTarget: {
+      setPointerCapture,
+      releasePointerCapture,
+      getBoundingClientRect: () => ({ width: 360, height: 520, top: 0, left: 0, right: 360, bottom: 520 }),
+    } as unknown as EventTarget,
     ...overrides,
   } as unknown as React.PointerEvent
 }

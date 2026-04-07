@@ -9,7 +9,7 @@ export interface Size {
 export type ResizeDir = 'e' | 's' | 'se' | 'sw' | 'w'
 
 const MIN_SIZE: Size = { w: 240, h: 280 }
-const MAX_SIZE: Size = { w: 900, h: 900 }
+const MAX_W = 900
 
 interface ResizeStart {
   pointerX: number
@@ -35,7 +35,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function useResize(initial: Size): UseResizeResult {
-  const [size, setSize] = useState<Size>(initial)
+  const [size, setSize] = useState<Size>(() => ({
+    w: clamp(initial.w, MIN_SIZE.w, MAX_W),
+    h: clamp(initial.h, MIN_SIZE.h, Math.floor(window.innerHeight * 0.9)),
+  }))
   const [isResizing, setIsResizing] = useState(false)
   const startRef = useRef<ResizeStart | null>(null)
 
@@ -72,9 +75,10 @@ export function useResize(initial: Size): UseResizeResult {
         if (s.dir === 'w' || s.dir === 'sw') newW = s.originW - dx
         if (s.dir === 's' || s.dir === 'se' || s.dir === 'sw') newH = s.originH + dy
 
+        const maxH = Math.floor(window.innerHeight * 0.9)
         setSize({
-          w: clamp(newW, MIN_SIZE.w, MAX_SIZE.w),
-          h: clamp(newH, MIN_SIZE.h, MAX_SIZE.h),
+          w: clamp(newW, MIN_SIZE.w, MAX_W),
+          h: clamp(newH, MIN_SIZE.h, maxH),
         })
       },
 

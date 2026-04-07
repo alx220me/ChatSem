@@ -18,7 +18,9 @@ export function MessageInput({
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const [emojiAnchorRect, setEmojiAnchorRect] = useState<DOMRect | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const emojiButtonRef = useRef<HTMLButtonElement>(null)
 
   async function handleSend() {
     const trimmed = text.trim()
@@ -63,6 +65,9 @@ export function MessageInput({
   }
 
   function toggleEmojiPicker() {
+    if (!emojiPickerOpen && emojiButtonRef.current) {
+      setEmojiAnchorRect(emojiButtonRef.current.getBoundingClientRect())
+    }
     setEmojiPickerOpen((prev) => {
       console.debug('[MessageInput] emoji picker open/close:', !prev)
       return !prev
@@ -151,8 +156,9 @@ export function MessageInput({
             opacity: isDisabled ? 0.6 : 1,
           }}
         />
-        <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div style={{ flexShrink: 0 }}>
           <button
+            ref={emojiButtonRef}
             onClick={toggleEmojiPicker}
             onMouseDown={(e) => e.stopPropagation()}
             disabled={isDisabled}
@@ -171,27 +177,35 @@ export function MessageInput({
           >
             😊
           </button>
-          {emojiPickerOpen && (
-            <EmojiPicker onSelect={handleEmojiSelect} onClose={closeEmojiPicker} />
+          {emojiPickerOpen && emojiAnchorRect && (
+            <EmojiPicker onSelect={handleEmojiSelect} onClose={closeEmojiPicker} anchorRect={emojiAnchorRect} />
           )}
         </div>
         <button
           onClick={() => void handleSend()}
           disabled={isDisabled || !text.trim()}
+          aria-label="Отправить"
+          title="Отправить"
           style={{
-            padding: '8px 16px',
+            width: 38,
+            height: 38,
             borderRadius: 8,
             border: 'none',
             backgroundColor: isDisabled || !text.trim() ? '#ccc' : '#2563eb',
             color: '#fff',
             cursor: isDisabled || !text.trim() ? 'not-allowed' : 'pointer',
-            fontSize: 14,
-            fontWeight: 600,
             flexShrink: 0,
-            height: 38,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0,
+            opacity: sending ? 0.7 : 1,
           }}
         >
-          {sending ? '...' : 'Send'}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
       </div>
     </div>

@@ -23,6 +23,8 @@ interface DragStart {
   pointerY: number
   originX: number
   originY: number
+  elW: number
+  elH: number
 }
 
 /** Returns the bottom-right fallback position when no drag has occurred yet. */
@@ -51,11 +53,14 @@ export function useDrag(initial?: DragPos): UseDragResult {
     e.preventDefault()
 
     const origin = pos ?? getDefaultPos()
+    const rect = e.currentTarget.getBoundingClientRect()
     dragStartRef.current = {
       pointerX: e.clientX,
       pointerY: e.clientY,
       originX: origin.x,
       originY: origin.y,
+      elW: rect.width,
+      elH: rect.height,
     }
     setIsDragging(true)
 
@@ -67,20 +72,22 @@ export function useDrag(initial?: DragPos): UseDragResult {
   function onPointerMove(e: React.PointerEvent) {
     if (!dragStartRef.current) return
 
-    const dx = e.clientX - dragStartRef.current.pointerX
-    const dy = e.clientY - dragStartRef.current.pointerY
+    const { pointerX, pointerY, originX, originY, elW, elH } = dragStartRef.current
+    const dx = e.clientX - pointerX
+    const dy = e.clientY - pointerY
     setPos({
-      x: dragStartRef.current.originX + dx,
-      y: dragStartRef.current.originY + dy,
+      x: Math.max(0, Math.min(originX + dx, window.innerWidth - elW)),
+      y: Math.max(0, Math.min(originY + dy, window.innerHeight - elH)),
     })
   }
 
   function onPointerUp(e: React.PointerEvent) {
     if (!dragStartRef.current) return
 
+    const { pointerX, pointerY, originX, originY, elW, elH } = dragStartRef.current
     const finalPos = {
-      x: dragStartRef.current.originX + (e.clientX - dragStartRef.current.pointerX),
-      y: dragStartRef.current.originY + (e.clientY - dragStartRef.current.pointerY),
+      x: Math.max(0, Math.min(originX + (e.clientX - pointerX), window.innerWidth - elW)),
+      y: Math.max(0, Math.min(originY + (e.clientY - pointerY), window.innerHeight - elH)),
     }
     dragStartRef.current = null
     setIsDragging(false)
