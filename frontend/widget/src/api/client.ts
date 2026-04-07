@@ -16,6 +16,8 @@ export class ApiClient {
   private baseUrl: string
   private getToken: () => string
   private onTokenExpired?: () => Promise<string>
+  /** Deduplicates concurrent token refresh calls — only one in-flight at a time. */
+  private refreshPromise: Promise<string> | null = null
 
   constructor(
     baseUrl: string,
@@ -54,16 +56,18 @@ export class ApiClient {
       if (import.meta.env.DEV) {
         console.warn('[ApiClient] token expired, refreshing')
       }
-      const newToken = await this.onTokenExpired()
-      // Update token via closure — caller must re-wire getToken if needed.
-      // We store refreshed token temporarily for the retry call.
-      const savedGetToken = this.getToken
-      this.getToken = () => newToken
-      try {
-        return await this.request<T>(method, path, body, signal, false)
-      } finally {
-        this.getToken = savedGetToken
+      // Deduplicate: if a refresh is already in-flight (e.g. concurrent poll + heartbeat
+      // both got 401), all callers await the same promise instead of triggering N refreshes.
+      if (!this.refreshPromise) {
+        this.refreshPromise = this.onTokenExpired().finally(() => {
+          this.refreshPromise = null
+        })
       }
+      const newToken = await this.refreshPromise
+      // Permanently update getToken so subsequent requests use the new token.
+      // Not restoring the old getter was the root cause of the infinite 401→refresh loop.
+      this.getToken = () => newToken
+      return await this.request<T>(method, path, body, signal, false)
     }
 
     if (!res.ok) {
