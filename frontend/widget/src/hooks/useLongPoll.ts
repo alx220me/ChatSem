@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { HttpError } from '../api/client'
 import type { ApiClient } from '../api/client'
-import type { Message } from '../types'
+import type { Message, EditedMessage } from '../types'
 
 export function useLongPoll(
   api: ApiClient,
   chatId: string | null,
   initialSeq: number,
-  onMessages: (msgs: Message[], deletedIds: string[]) => void,
+  onMessages: (msgs: Message[], deletedIds: string[], editedMessages: EditedMessage[]) => void,
   onError?: (err: unknown) => void,
 ): void {
   const onMessagesRef = useRef(onMessages)
@@ -24,6 +24,7 @@ export function useLongPoll(
     const controller = new AbortController()
     let lastKnownSeq = initialSeqRef.current
     let lastKnownDeleteSeq = 0
+    let lastKnownEditSeq = 0
     let running = true
     const seenIds = new Set<string>()
     let retryDelay = 1_000        // starts at 1s
@@ -32,13 +33,14 @@ export function useLongPoll(
     async function loop() {
       while (running && !controller.signal.aborted) {
         if (import.meta.env.DEV) {
-          console.debug('[useLongPoll] poll', chatId, 'after', lastKnownSeq, 'delete_seq', lastKnownDeleteSeq)
+          console.debug('[useLongPoll] poll', chatId, 'after', lastKnownSeq, 'delete_seq', lastKnownDeleteSeq, 'edit_seq', lastKnownEditSeq)
         }
 
         try {
-          const response = await api.poll(chatId!, lastKnownSeq, lastKnownDeleteSeq, controller.signal)
+          const response = await api.poll(chatId!, lastKnownSeq, lastKnownDeleteSeq, lastKnownEditSeq, controller.signal)
           const msgs = response.messages ?? []
           const deletedIds = response.deleted_ids ?? []
+          const editedMessages = response.edited_messages ?? []
 
           // Successful response — reset backoff
           retryDelay = 1_000
@@ -46,6 +48,11 @@ export function useLongPoll(
           // Advance delete cursor
           if (response.last_delete_seq != null && response.last_delete_seq > lastKnownDeleteSeq) {
             lastKnownDeleteSeq = response.last_delete_seq
+          }
+
+          // Advance edit cursor
+          if (response.last_edit_seq != null && response.last_edit_seq > lastKnownEditSeq) {
+            lastKnownEditSeq = response.last_edit_seq
           }
 
           // Deduplicate new messages by id
@@ -60,11 +67,14 @@ export function useLongPoll(
             lastKnownSeq = maxSeq
           }
 
-          if (fresh.length > 0 || deletedIds.length > 0) {
+          if (fresh.length > 0 || deletedIds.length > 0 || editedMessages.length > 0) {
             if (import.meta.env.DEV && deletedIds.length > 0) {
               console.debug('[useLongPoll] deletions', deletedIds.length)
             }
-            onMessagesRef.current(fresh, deletedIds)
+            if (import.meta.env.DEV && editedMessages.length > 0) {
+              console.debug('[useLongPoll] edits', editedMessages.length)
+            }
+            onMessagesRef.current(fresh, deletedIds, editedMessages)
           }
           // Empty response (204) → immediate reconnect, no delay
         } catch (err) {

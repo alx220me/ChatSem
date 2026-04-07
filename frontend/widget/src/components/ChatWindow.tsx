@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react'
 import type { ApiClient } from '../api/client'
-import type { Message, WidgetConfig } from '../types'
+import type { Message, EditedMessage, WidgetConfig } from '../types'
 import { useChat } from '../hooks/useChat'
 import { useLongPoll } from '../hooks/useLongPoll'
 import { useOnline } from '../hooks/useOnline'
@@ -36,13 +36,21 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     }
   }, [loading, initialized, messages, chat])
 
-  const handlePollMessages = useCallback((incoming: Message[], deletedIds: string[]) => {
+  const handlePollMessages = useCallback((incoming: Message[], deletedIds: string[], editedMessages: EditedMessage[]) => {
     setPollError(null)
     setAllMessages((prev) => {
       let next = prev
       if (deletedIds.length > 0) {
         const deletedSet = new Set(deletedIds)
         next = next.filter((m) => !deletedSet.has(m.id))
+      }
+      if (editedMessages.length > 0) {
+        const editMap = new Map(editedMessages.map((e) => [e.id, e]))
+        next = next.map((m) => {
+          const edit = editMap.get(m.id)
+          if (!edit) return m
+          return { ...m, text: edit.text, editedAt: edit.edited_at }
+        })
       }
       if (incoming.length > 0) {
         const existingIds = new Set(next.map((m) => m.id))
@@ -66,6 +74,22 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
 
   const currentUserId = api.getCurrentUserId()
   const currentUserRole = api.getCurrentUserRole()
+
+  const handleEdit = useCallback(
+    async (msgId: string, newText: string) => {
+      try {
+        const updated = await api.editMessage(msgId, newText)
+        setAllMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, text: updated.text, editedAt: updated.edited_at } : m,
+          ),
+        )
+      } catch (err) {
+        console.warn('[ChatWindow] edit failed', err)
+      }
+    },
+    [api],
+  )
 
   const handleDelete = useCallback(
     async (msgId: string) => {
@@ -111,7 +135,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
       const optimistic: Message = {
         id: optimisticId,
         chatId: chat.id,
-        userId: '',
+        userId: currentUserId,
         userName: api.getCurrentUserName(),
         text,
         seq: -1,
@@ -130,7 +154,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         setAllMessages((prev) =>
           prev.map((m) =>
             m.id === optimisticId
-              ? { ...m, id: response.id, seq: response.seq, createdAt: response.ts }
+              ? { ...m, id: response.id, seq: response.seq, createdAt: response.ts, userId: currentUserId }
               : m,
           ),
         )
@@ -247,6 +271,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             currentUserId={currentUserId}
             currentUserRole={currentUserRole}
             onDelete={handleDelete}
+            onEdit={handleEdit}
             onBan={handleBan}
             onMute={handleMute}
             onReply={setReplyingTo}

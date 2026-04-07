@@ -109,13 +109,26 @@ export class ApiClient {
     return this.request<SendResponse>('POST', `/chat/${chatId}/messages`, body)
   }
 
-  async poll(chatId: string, afterSeq: number, afterDeleteSeq: number, signal: AbortSignal): Promise<PollResponse> {
+  async poll(
+    chatId: string,
+    afterSeq: number,
+    afterDeleteSeq: number,
+    afterEditSeq: number,
+    signal: AbortSignal,
+  ): Promise<PollResponse> {
     return this.request<PollResponse>(
       'GET',
-      `/chat/${chatId}/poll?after=${afterSeq}&after_delete_seq=${afterDeleteSeq}`,
+      `/chat/${chatId}/poll?after=${afterSeq}&after_delete_seq=${afterDeleteSeq}&after_edit_seq=${afterEditSeq}`,
       undefined,
       signal,
     )
+  }
+
+  async editMessage(
+    msgId: string,
+    text: string,
+  ): Promise<{ id: string; text: string; edited_at: string }> {
+    return this.request('PATCH', `/chat/messages/${msgId}`, { text })
   }
 
   /** Decode JWT payload (no signature verification — server already did that). */

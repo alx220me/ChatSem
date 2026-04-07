@@ -11,6 +11,7 @@ interface MessageListProps {
   onBan?: (userId: string, reason: string) => void
   onMute?: (userId: string, reason: string) => void
   onReply?: (msg: Message) => void
+  onEdit?: (msgId: string, newText: string) => Promise<void>
 }
 
 interface ModTarget {
@@ -72,12 +73,15 @@ export function MessageList({
   onBan,
   onMute,
   onReply,
+  onEdit,
 }: MessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [modTarget, setModTarget] = useState<ModTarget | null>(null)
   const [modReason, setModReason] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
   const isMod = currentUserRole === 'moderator' || currentUserRole === 'admin'
 
@@ -92,6 +96,19 @@ export function MessageList({
     else onMute?.(modTarget.userId, reason)
     setModTarget(null)
     setModReason('')
+  }
+
+  async function handleEditSave(msgId: string) {
+    const trimmed = editText.trim()
+    if (!trimmed || !onEdit) {
+      setEditingId(null)
+      return
+    }
+    if (import.meta.env.DEV) {
+      console.debug('[MessageList] edit save', msgId, trimmed)
+    }
+    await onEdit(msgId, trimmed)
+    setEditingId(null)
   }
 
   function scrollToSeq(seq: number) {
@@ -122,8 +139,10 @@ export function MessageList({
       {messages.map((msg) => {
         const isOwn = msg.userId === currentUserId
         const canDelete = (isOwn || isMod) && msg.seq !== -1
+        const canEdit = isOwn && msg.seq !== -1 && !!onEdit
         const canBan = isMod && !isOwn && msg.seq !== -1
-        const showActions = hoveredId === msg.id && (canDelete || canBan || !!onReply)
+        const showActions = hoveredId === msg.id && (canDelete || canEdit || canBan || !!onReply)
+        const isEditing = editingId === msg.id
 
         return (
           <div
@@ -184,16 +203,47 @@ export function MessageList({
                 </div>
               )}
 
-              <div
-                style={{
-                  fontSize: 14,
-                  color: '#1a1a1a',
-                  wordBreak: 'break-word',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {msg.text}
-              </div>
+              {isEditing ? (
+                <textarea
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      void handleEditSave(msg.id)
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingId(null)
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    fontSize: 14,
+                    padding: '4px 6px',
+                    border: '1px solid #2563eb',
+                    borderRadius: 4,
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    minHeight: 60,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    fontSize: 14,
+                    color: '#1a1a1a',
+                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {msg.text}
+                  {msg.editedAt && (
+                    <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 6 }}>(изм.)</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Action buttons on hover */}
@@ -219,6 +269,18 @@ export function MessageList({
                     style={actionBtnStyle}
                   >
                     ↩
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    title="Редактировать сообщение"
+                    onClick={() => {
+                      setEditingId(msg.id)
+                      setEditText(msg.text)
+                    }}
+                    style={actionBtnStyle}
+                  >
+                    ✏️
                   </button>
                 )}
                 {canDelete && (
