@@ -36,6 +36,7 @@ type UserRepository interface {
 // BanRepository is the minimal ban store interface needed by the admin service.
 type BanRepository interface {
 	Create(ctx context.Context, b *domain.Ban) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Ban, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	ListByEventID(ctx context.Context, eventID uuid.UUID) ([]*domain.Ban, error)
 }

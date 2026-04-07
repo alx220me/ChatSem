@@ -37,6 +37,20 @@ func (r *BanRepo) Create(ctx context.Context, b *domain.Ban) error {
 	return nil
 }
 
+// GetByID returns a ban by its ID, or an error if not found.
+func (r *BanRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Ban, error) {
+	slog.Debug("[BanRepo.GetByID] query", "ban_id", id)
+	b := &domain.Ban{}
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, event_id, chat_id, banned_by, reason, created_at, expires_at
+		FROM bans WHERE id = $1`, id).
+		Scan(&b.ID, &b.UserID, &b.EventID, &b.ChatID, &b.BannedBy, &b.Reason, &b.CreatedAt, &b.ExpiresAt)
+	if err != nil {
+		return nil, fmt.Errorf("BanRepo.GetByID: %w", err)
+	}
+	return b, nil
+}
+
 // Delete removes a ban by ID (expire / unban).
 func (r *BanRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	slog.Debug("[BanRepo.Delete] deleting ban", "ban_id", id)

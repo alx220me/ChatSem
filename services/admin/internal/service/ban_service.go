@@ -61,13 +61,23 @@ func (s *BanService) CreateBan(ctx context.Context, userID, eventID, bannedBy uu
 func (s *BanService) UnbanUser(ctx context.Context, banID uuid.UUID) error {
 	slog.Debug("[BanService.UnbanUser] start", "ban_id", banID)
 
+	// Fetch before delete so we know which Redis key to invalidate.
+	ban, err := s.bans.GetByID(ctx, banID)
+	if err != nil {
+		return fmt.Errorf("BanService.UnbanUser: get ban: %w", err)
+	}
+
 	if err := s.bans.Delete(ctx, banID); err != nil {
 		return fmt.Errorf("BanService.UnbanUser: %w", err)
 	}
-	slog.Info("[BanService.UnbanUser] unbanned", "ban_id", banID)
+	slog.Info("[BanService.UnbanUser] unbanned", "ban_id", banID, "user_id", ban.UserID, "event_id", ban.EventID)
 
-	// Best-effort Redis cleanup — we don't know which (eventID, userID) without fetching the ban first.
-	// The cache will expire naturally.
+	// Remove from Redis so the chat service no longer blocks the user on the fast path.
+	banKey := fmt.Sprintf("ban:%s:%s", ban.EventID, ban.UserID)
+	if err := s.rdb.Del(ctx, banKey).Err(); err != nil {
+		slog.Warn("[BanService.UnbanUser] redis DEL failed (non-fatal)", "key", banKey, "err", err)
+	}
+
 	return nil
 }
 
