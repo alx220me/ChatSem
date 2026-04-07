@@ -98,8 +98,13 @@ ChatSem/
 
 | Document | Path | Description |
 |----------|------|-------------|
+| README | README.md | Project landing page |
+| Getting Started | docs/getting-started.md | Installation, setup, first steps |
+| Architecture | docs/architecture.md | Services, patterns, data flow |
+| API Reference | docs/api.md | Endpoints for chat, auth, admin |
+| Configuration | docs/configuration.md | Env vars, Docker Compose, nginx |
 | Project spec | .ai-factory/DESCRIPTION.md | Tech stack and features |
-| Architecture | .ai-factory/ARCHITECTURE.md | Architecture decisions |
+| Architecture decisions | .ai-factory/ARCHITECTURE.md | Architecture decisions |
 | Roadmap | .ai-factory/ROADMAP.md | Project milestones |
 
 ## AI Context Files
