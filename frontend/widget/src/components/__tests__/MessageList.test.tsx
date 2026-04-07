@@ -1,11 +1,34 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MessageList } from '../MessageList'
 import type { Message } from '../../types'
 
+// Captured IntersectionObserver callback for triggering in tests
+let intersectionCallback: IntersectionObserverCallback | null = null
+
+function triggerTopSentinelVisible() {
+  act(() => {
+    intersectionCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+  })
+}
+
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn()
+
+  // Mock IntersectionObserver as a class so `new IntersectionObserver(cb)` works
+  class MockIntersectionObserver {
+    constructor(callback: IntersectionObserverCallback) {
+      intersectionCallback = callback
+    }
+    observe = vi.fn()
+    disconnect = vi.fn()
+    unobserve = vi.fn()
+  }
+  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
 })
 
 function makeMsg(overrides: Partial<Message> = {}): Message {
@@ -214,5 +237,78 @@ describe('MessageList', () => {
     const msg = makeMsg({ editedAt: undefined })
     render(<MessageList messages={[msg]} loading={false} onReply={onReply} />)
     expect(screen.queryByText('(изм.)')).not.toBeInTheDocument()
+  })
+
+  // --- Infinite scroll tests ---
+
+  it('calls onLoadMore when top sentinel becomes visible', () => {
+    const onLoadMore = vi.fn()
+    render(
+      <MessageList
+        messages={[makeMsg()]}
+        loading={false}
+        onLoadMore={onLoadMore}
+        loadingMore={false}
+        onReply={onReply}
+      />,
+    )
+    triggerTopSentinelVisible()
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not call onLoadMore again while loadingMore=true', () => {
+    const onLoadMore = vi.fn()
+    const { rerender } = render(
+      <MessageList
+        messages={[makeMsg()]}
+        loading={false}
+        onLoadMore={onLoadMore}
+        loadingMore={false}
+        onReply={onReply}
+      />,
+    )
+    // First trigger
+    triggerTopSentinelVisible()
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+
+    // Re-render with loadingMore=true (simulates loading in-flight)
+    rerender(
+      <MessageList
+        messages={[makeMsg()]}
+        loading={false}
+        onLoadMore={onLoadMore}
+        loadingMore={true}
+        onReply={onReply}
+      />,
+    )
+    // Trigger again — should NOT call because loadingTriggeredRef still true
+    triggerTopSentinelVisible()
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows spinner when loadingMore=true', () => {
+    render(
+      <MessageList
+        messages={[makeMsg()]}
+        loading={false}
+        onLoadMore={vi.fn()}
+        loadingMore={true}
+        onReply={onReply}
+      />,
+    )
+    expect(screen.getByText('Загрузка...')).toBeInTheDocument()
+  })
+
+  it('does not show spinner when loadingMore=false', () => {
+    render(
+      <MessageList
+        messages={[makeMsg()]}
+        loading={false}
+        onLoadMore={vi.fn()}
+        loadingMore={false}
+        onReply={onReply}
+      />,
+    )
+    expect(screen.queryByText('Загрузка...')).not.toBeInTheDocument()
   })
 })

@@ -17,11 +17,12 @@ import (
 // --- mock MessageRepository ---
 
 type mockMessageRepo struct {
-	create              func(ctx context.Context, m *domain.Message) error
-	getByID             func(ctx context.Context, id uuid.UUID) (*domain.Message, error)
-	softDel             func(ctx context.Context, id uuid.UUID) error
-	update              func(ctx context.Context, id uuid.UUID, newText string) error
-	getByChatIDAfterSeq func(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error)
+	create               func(ctx context.Context, m *domain.Message) error
+	getByID              func(ctx context.Context, id uuid.UUID) (*domain.Message, error)
+	softDel              func(ctx context.Context, id uuid.UUID) error
+	update               func(ctx context.Context, id uuid.UUID, newText string) error
+	getByChatIDAfterSeq  func(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error)
+	getByChatIDBeforeSeq func(ctx context.Context, chatID uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error)
 }
 
 func (m *mockMessageRepo) Create(ctx context.Context, msg *domain.Message) error {
@@ -42,6 +43,12 @@ func (m *mockMessageRepo) Update(ctx context.Context, id uuid.UUID, newText stri
 func (m *mockMessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error) {
 	if m.getByChatIDAfterSeq != nil {
 		return m.getByChatIDAfterSeq(ctx, chatID, afterSeq, limit)
+	}
+	return nil, nil
+}
+func (m *mockMessageRepo) GetByChatIDBeforeSeq(ctx context.Context, chatID uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error) {
+	if m.getByChatIDBeforeSeq != nil {
+		return m.getByChatIDBeforeSeq(ctx, chatID, beforeSeq, limit)
 	}
 	return nil, nil
 }
@@ -362,4 +369,46 @@ func TestEditMessage_TooLongText(t *testing.T) {
 		t.Errorf("[%s] expected ErrMessageTooLong, got %v", t.Name(), err)
 	}
 	t.Logf("[%s] assert: 4097-char text → ErrMessageTooLong", t.Name())
+}
+
+func TestGetMessagesBefore_ReturnsMessages(t *testing.T) {
+	chatID := uuid.New()
+	want := []*domain.Message{
+		{ID: uuid.New(), ChatID: chatID, Seq: 1, Text: "old message 1"},
+		{ID: uuid.New(), ChatID: chatID, Seq: 2, Text: "old message 2"},
+	}
+	msgRepo := &mockMessageRepo{
+		getByChatIDBeforeSeq: func(_ context.Context, id uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error) {
+			if id != chatID {
+				t.Errorf("[%s] unexpected chatID: %v", t.Name(), id)
+			}
+			return want, nil
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	got, err := svc.GetMessagesBefore(context.Background(), chatID, 10, 50)
+	if err != nil {
+		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
+	}
+	if len(got) != len(want) {
+		t.Errorf("[%s] expected %d messages, got %d", t.Name(), len(want), len(got))
+	}
+	t.Logf("[%s] assert: returns %d messages with seq < beforeSeq", t.Name(), len(got))
+}
+
+func TestGetMessagesBefore_EmptyResult(t *testing.T) {
+	msgRepo := &mockMessageRepo{
+		getByChatIDBeforeSeq: func(_ context.Context, _ uuid.UUID, _ int64, _ int) ([]*domain.Message, error) {
+			return []*domain.Message{}, nil
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	got, err := svc.GetMessagesBefore(context.Background(), uuid.New(), 1, 50)
+	if err != nil {
+		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
+	}
+	if len(got) != 0 {
+		t.Errorf("[%s] expected empty slice, got %d messages", t.Name(), len(got))
+	}
+	t.Logf("[%s] assert: empty result when no older messages", t.Name())
 }

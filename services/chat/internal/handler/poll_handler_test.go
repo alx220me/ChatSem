@@ -72,6 +72,9 @@ func (m *pollMockMessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uu
 func (m *pollMockMessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error) {
 	return nil, nil
 }
+func (m *pollMockMessageRepo) GetByChatIDBeforeSeq(ctx context.Context, chatID uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error) {
+	return nil, nil
+}
 func (m *pollMockMessageRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
 func (m *pollMockMessageRepo) Update(ctx context.Context, id uuid.UUID, newText string) error {
 	return nil
