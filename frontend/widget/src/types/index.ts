@@ -85,4 +85,15 @@ export interface WidgetConfig {
    * Min: 240 × 280. Max: 900 × 900.
    */
   defaultSize?: { w: number; h: number }
+  /**
+   * Accent color for the widget UI (CSS color string, e.g. "#2563eb" or "rgb(37,99,235)").
+   * Applied to the chat header background and the collapsed FAB button.
+   * Defaults to #2563eb (blue).
+   */
+  accentColor?: string
+  /**
+   * Text/icon color used inside elements painted with accentColor (header, FAB).
+   * Defaults to #ffffff (white). Use a dark value (e.g. "#111111") when accentColor is light.
+   */
+  accentTextColor?: string
 }

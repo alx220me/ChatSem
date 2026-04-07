@@ -220,6 +220,22 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     [chat, sendMessage, replyingTo],
   )
 
+  const accent = config.accentColor ?? '#2563eb'
+  const accentText = config.accentTextColor ?? '#ffffff'
+  // Derive a semi-transparent version of accentText for secondary labels and borders.
+  const accentTextMuted = accentText === '#ffffff' || accentText === 'white'
+    ? 'rgba(255,255,255,0.85)'
+    : 'rgba(0,0,0,0.55)'
+  const accentTextSubtle = accentText === '#ffffff' || accentText === 'white'
+    ? 'rgba(255,255,255,0.4)'
+    : 'rgba(0,0,0,0.2)'
+  const accentBorder = accentText === '#ffffff' || accentText === 'white'
+    ? 'rgba(255,255,255,0.35)'
+    : 'rgba(0,0,0,0.2)'
+  const accentBtnBg = accentText === '#ffffff' || accentText === 'white'
+    ? 'rgba(255,255,255,0.15)'
+    : 'rgba(0,0,0,0.08)'
+
   // ─── Floating: collapsed FAB ─────────────────────────────────────────────
   // FAB is always anchored to bottom-right — no drag, no dynamic position.
   if (config.floating && collapsed) {
@@ -235,7 +251,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           bottom: 20,
           height: 36,
           borderRadius: 18,
-          backgroundColor: '#2563eb',
+          backgroundColor: accent,
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           cursor: 'pointer',
           display: 'flex',
@@ -253,12 +269,12 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           style={{ flexShrink: 0 }}>
           <path
             d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
-            fill="white"
+            fill={accentText}
           />
         </svg>
 
         {/* Label */}
-        <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+        <span style={{ color: accentText, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
           Чат
         </span>
 
@@ -266,7 +282,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         {onlineCount > 0 && (
           <span style={{
             display: 'flex', alignItems: 'center', gap: 3,
-            color: 'rgba(255,255,255,0.85)', fontSize: 11, whiteSpace: 'nowrap',
+            color: accentTextMuted, fontSize: 11, whiteSpace: 'nowrap',
           }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%',
@@ -376,8 +392,8 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '10px 14px',
-            borderBottom: '1px solid #e5e5e5',
-            backgroundColor: '#fafafa',
+            borderBottom: '1px solid rgba(0,0,0,0.1)',
+            backgroundColor: accent,
             minHeight: 44,
             cursor: isDragging ? 'grabbing' : 'grab',
             touchAction: 'none',
@@ -387,7 +403,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             style={{
               fontWeight: 600,
               fontSize: 14,
-              color: '#111',
+              color: accentText,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -406,7 +422,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
                   alignItems: 'center',
                   gap: 5,
                   fontSize: 12,
-                  color: '#555',
+                  color: accentTextMuted,
                 }}
               >
                 <span
@@ -414,7 +430,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    backgroundColor: onlineCount > 0 ? '#22c55e' : '#d1d5db',
+                    backgroundColor: onlineCount > 0 ? '#4ade80' : accentTextSubtle,
                     display: 'inline-block',
                   }}
                 />
@@ -433,13 +449,13 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
                 width: 28,
                 height: 28,
                 borderRadius: 6,
-                border: '1px solid #e5e7eb',
-                backgroundColor: '#fff',
+                border: `1px solid ${accentBorder}`,
+                backgroundColor: accentBtnBg,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#374151',
+                color: accentText,
                 flexShrink: 0,
                 padding: 0,
               }}
@@ -522,8 +538,8 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '10px 14px',
-          borderBottom: '1px solid #e5e5e5',
-          backgroundColor: '#fafafa',
+          borderBottom: '1px solid rgba(0,0,0,0.1)',
+          backgroundColor: accent,
           minHeight: 44,
         }}
       >
@@ -531,7 +547,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           style={{
             fontWeight: 600,
             fontSize: 14,
-            color: '#111',
+            color: accentText,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -548,7 +564,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
               alignItems: 'center',
               gap: 5,
               fontSize: 12,
-              color: '#555',
+              color: accentTextMuted,
               flexShrink: 0,
             }}
           >
@@ -557,7 +573,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                backgroundColor: onlineCount > 0 ? '#22c55e' : '#d1d5db',
+                backgroundColor: onlineCount > 0 ? '#4ade80' : accentTextSubtle,
                 display: 'inline-block',
               }}
             />
