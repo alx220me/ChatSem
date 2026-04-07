@@ -57,4 +57,21 @@ export interface WidgetConfig {
   /** @deprecated Use tokenProvider instead. Kept for backward compatibility. */
   onTokenExpired?: () => Promise<string>
   roomId?: string
+  /**
+   * When true, renders the widget as a fixed-position floating window.
+   * Supports drag-to-move (by header) and collapse to FAB icon.
+   */
+  floating?: boolean
+  /**
+   * Initial collapsed state when floating=true.
+   * true  → starts as FAB icon with online count badge.
+   * false → starts expanded (default).
+   */
+  defaultCollapsed?: boolean
+  /**
+   * Initial position for the floating window.
+   * When omitted, the widget snaps to the bottom-right corner (right: 20px, bottom: 20px).
+   * After the user drags the widget, position is stored in React state.
+   */
+  defaultPosition?: { x: number; y: number }
 }
