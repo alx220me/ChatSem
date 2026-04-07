@@ -7,7 +7,7 @@ GOOSE_DIR  := ./migrations
 GOOSE_DB   := postgres
 
 .PHONY: migrate-up migrate-down migrate-status migrate-reset
-
+export DATABASE_URL=postgres://chatsem:q1w2e3r4@localhost:5433/chatsem?sslmode=disable
 migrate-up:
 	@echo "[migrate] applying all pending migrations..."
 	$(GOOSE) -dir $(GOOSE_DIR) $(GOOSE_DB) "$(DATABASE_URL)" up
