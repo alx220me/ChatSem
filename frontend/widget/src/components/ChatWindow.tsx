@@ -4,6 +4,7 @@ import type { Message, EditedMessage, WidgetConfig } from '../types'
 import { useChat } from '../hooks/useChat'
 import { useLongPoll } from '../hooks/useLongPoll'
 import { useOnline } from '../hooks/useOnline'
+import { useDrag } from '../hooks/useDrag'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 
@@ -28,6 +29,26 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   const [scrollToBottomTrigger, setScrollToBottomTrigger] = useState(0)
   const allMessagesRef = useRef(allMessages)
   useEffect(() => { allMessagesRef.current = allMessages }, [allMessages])
+
+  // Floating widget state — only active when config.floating === true
+  const [collapsed, setCollapsed] = useState(config.defaultCollapsed ?? false)
+  const { pos, isDragging, dragHandlers } = useDrag(config.defaultPosition)
+
+  const handleExpand = useCallback(() => {
+    if (!isDragging) {
+      setCollapsed(false)
+      if (import.meta.env.DEV) {
+        console.debug('[ChatWindow] floating expanded')
+      }
+    }
+  }, [isDragging])
+
+  const handleCollapse = useCallback(() => {
+    setCollapsed(true)
+    if (import.meta.env.DEV) {
+      console.debug('[ChatWindow] floating collapsed')
+    }
+  }, [])
 
   // Merge initial messages from useChat into allMessages once loaded
   React.useEffect(() => {
@@ -195,6 +216,254 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     [chat, sendMessage, replyingTo],
   )
 
+  // ─── Floating: collapsed FAB ────────────────────────────────────────────
+  if (config.floating && collapsed) {
+    const fabPos: React.CSSProperties = pos
+      ? { left: pos.x, top: pos.y }
+      : { right: 20, bottom: 20 }
+
+    return (
+      <div
+        role="button"
+        aria-label="Open chat"
+        data-testid="chat-fab"
+        onClick={handleExpand}
+        {...dragHandlers}
+        style={{
+          position: 'fixed',
+          ...fabPos,
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          backgroundColor: '#2563eb',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+          cursor: isDragging ? 'grabbing' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          userSelect: 'none',
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        }}
+      >
+        {/* Chat bubble icon */}
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
+            fill="white"
+          />
+        </svg>
+
+        {/* Online count badge */}
+        {onlineCount > 0 && (
+          <span
+            style={{
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              minWidth: 18,
+              height: 18,
+              borderRadius: 9,
+              backgroundColor: '#22c55e',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 4px',
+              border: '2px solid #fff',
+            }}
+          >
+            {onlineCount > 99 ? '99+' : onlineCount}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // ─── Shared inner content (used in both floating-expanded and embedded) ──
+  const innerContent = (
+    <>
+      {pollError && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            color: '#b91c1c',
+            fontSize: 13,
+            padding: '6px 12px',
+            textAlign: 'center',
+            borderBottom: '1px solid #fecaca',
+          }}
+        >
+          Connection error, retrying...
+        </div>
+      )}
+
+      {error && !loading && (
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#b91c1c',
+            fontSize: 14,
+            padding: 20,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {!error && (
+        <>
+          <MessageList
+            messages={initialized ? allMessages : messages}
+            loading={loading}
+            currentUserId={currentUserId}
+            currentUserRole={currentUserRole}
+            onDelete={handleDelete}
+            onEdit={handleEdit}
+            onBan={handleBan}
+            onMute={handleMute}
+            onReply={setReplyingTo}
+            onLoadMore={hasMore ? loadOlderMessages : undefined}
+            loadingMore={loadingMore}
+            scrollToBottomTrigger={scrollToBottomTrigger}
+          />
+          <MessageInput
+            onSend={handleSend}
+            disabled={loading || !chat}
+            replyingTo={replyingTo ?? undefined}
+            onCancelReply={() => setReplyingTo(null)}
+          />
+        </>
+      )}
+    </>
+  )
+
+  // ─── Floating: expanded window ───────────────────────────────────────────
+  if (config.floating) {
+    const windowPos: React.CSSProperties = pos
+      ? { left: pos.x, top: pos.y }
+      : { right: 20, bottom: 80 }
+
+    return (
+      <div
+        data-testid="chat-window-floating"
+        style={{
+          position: 'fixed',
+          ...windowPos,
+          width: 360,
+          height: 520,
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+          backgroundColor: '#fff',
+          border: '1px solid #e5e5e5',
+          borderRadius: 12,
+          overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          zIndex: 9999,
+          userSelect: isDragging ? 'none' : undefined,
+        }}
+      >
+        {/* Drag handle header */}
+        <div
+          {...dragHandlers}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 14px',
+            borderBottom: '1px solid #e5e5e5',
+            backgroundColor: '#fafafa',
+            minHeight: 44,
+            cursor: isDragging ? 'grabbing' : 'grab',
+            touchAction: 'none',
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              color: '#111',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {chat
+              ? (chat.externalRoomId ? `#${chat.externalRoomId}` : 'Chat')
+              : (loading ? '' : 'Chat')}
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {chat && (
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 12,
+                  color: '#555',
+                }}
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: onlineCount > 0 ? '#22c55e' : '#d1d5db',
+                    display: 'inline-block',
+                  }}
+                />
+                {onlineCount} online
+              </span>
+            )}
+
+            {/* Collapse button */}
+            <button
+              aria-label="Collapse chat"
+              data-testid="chat-collapse-btn"
+              onClick={handleCollapse}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 4,
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                fontSize: 16,
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              &#x2212;
+            </button>
+          </div>
+        </div>
+
+        {innerContent}
+      </div>
+    )
+  }
+
+  // ─── Embedded (default): fills the host-page container ───────────────────
   return (
     <div
       style={{
@@ -260,61 +529,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         )}
       </div>
 
-      {pollError && (
-        <div
-          style={{
-            backgroundColor: '#fef2f2',
-            color: '#b91c1c',
-            fontSize: 13,
-            padding: '6px 12px',
-            textAlign: 'center',
-            borderBottom: '1px solid #fecaca',
-          }}
-        >
-          Connection error, retrying...
-        </div>
-      )}
-
-      {error && !loading && (
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#b91c1c',
-            fontSize: 14,
-            padding: 20,
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {!error && (
-        <>
-          <MessageList
-            messages={initialized ? allMessages : messages}
-            loading={loading}
-            currentUserId={currentUserId}
-            currentUserRole={currentUserRole}
-            onDelete={handleDelete}
-            onEdit={handleEdit}
-            onBan={handleBan}
-            onMute={handleMute}
-            onReply={setReplyingTo}
-            onLoadMore={hasMore ? loadOlderMessages : undefined}
-            loadingMore={loadingMore}
-            scrollToBottomTrigger={scrollToBottomTrigger}
-          />
-          <MessageInput
-            onSend={handleSend}
-            disabled={loading || !chat}
-            replyingTo={replyingTo ?? undefined}
-            onCancelReply={() => setReplyingTo(null)}
-          />
-        </>
-      )}
+      {innerContent}
     </div>
   )
 }
