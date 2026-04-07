@@ -6,6 +6,7 @@ import type { Message } from '../types'
 export function useLongPoll(
   api: ApiClient,
   chatId: string | null,
+  initialSeq: number,
   onMessages: (msgs: Message[], deletedIds: string[]) => void,
   onError?: (err: unknown) => void,
 ): void {
@@ -13,12 +14,15 @@ export function useLongPoll(
   onMessagesRef.current = onMessages
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
+  // Sync on every render so the effect captures the right value when chatId first becomes non-null.
+  const initialSeqRef = useRef(initialSeq)
+  initialSeqRef.current = initialSeq
 
   useEffect(() => {
     if (!chatId) return
 
     const controller = new AbortController()
-    let lastKnownSeq = 0
+    let lastKnownSeq = initialSeqRef.current
     let lastKnownDeleteSeq = 0
     let running = true
     const seenIds = new Set<string>()

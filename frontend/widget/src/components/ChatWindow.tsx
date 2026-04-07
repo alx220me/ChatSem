@@ -59,7 +59,9 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     setPollError(msg)
   }, [])
 
-  useLongPoll(api, chat?.id ?? null, handlePollMessages, handlePollError)
+  // Start polling from the highest seq already loaded to avoid receiving stale messages out of order.
+  const initialSeq = messages.reduce((max, m) => Math.max(max, m.seq), 0)
+  useLongPoll(api, initialized ? (chat?.id ?? null) : null, initialSeq, handlePollMessages, handlePollError)
   const onlineCount = useOnline(api, chat?.id ?? null)
 
   const currentUserId = api.getCurrentUserId()

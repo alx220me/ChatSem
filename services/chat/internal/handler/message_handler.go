@@ -119,9 +119,18 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Debug("[MessageHandler.List] request", "chat_id", chatID, "after_seq", afterSeq, "limit", limit)
-	msgs, err := h.svc.GetMessages(r.Context(), chatID, afterSeq, limit)
-	if err != nil {
-		slog.Warn("[MessageHandler.List] error", "err", err)
+
+	var msgs []*domain.Message
+	var listErr error
+	if afterSeq == 0 {
+		// Initial load: return the most recent messages in chronological order.
+		msgs, listErr = h.svc.ListMessages(r.Context(), chatID, limit)
+	} else {
+		// Incremental load: return messages after a known seq.
+		msgs, listErr = h.svc.GetMessages(r.Context(), chatID, afterSeq, limit)
+	}
+	if listErr != nil {
+		slog.Warn("[MessageHandler.List] error", "err", listErr)
 		response.Error(w, http.StatusInternalServerError, "internal_error", "failed to list messages")
 		return
 	}

@@ -118,6 +118,24 @@ func (s *MessageService) SendMessage(ctx context.Context, chatID, userID, eventI
 	return msg, nil
 }
 
+// ListMessages returns the most recent limit messages for chatID in ascending (chronological) order.
+// It delegates to ListByChatID (DESC) and reverses the result.
+func (s *MessageService) ListMessages(ctx context.Context, chatID uuid.UUID, limit int) ([]*domain.Message, error) {
+	slog.Debug("[MessageService.ListMessages] query", "chat_id", chatID, "limit", limit)
+	if limit > 100 {
+		limit = 100
+	}
+	msgs, err := s.messages.ListByChatID(ctx, chatID, limit, 0)
+	if err != nil {
+		return nil, fmt.Errorf("MessageService.ListMessages: %w", err)
+	}
+	// ListByChatID returns DESC; reverse to chronological (ASC) order for display.
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+	return msgs, nil
+}
+
 // GetMessages returns messages in chatID with seq > afterSeq, capped at 100.
 func (s *MessageService) GetMessages(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error) {
 	slog.Debug("[MessageService.GetMessages] query", "chat_id", chatID, "after_seq", afterSeq, "limit", limit)
