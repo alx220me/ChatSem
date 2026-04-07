@@ -24,8 +24,9 @@ func NewChatHandler(svc *service.ChatService) *ChatHandler {
 }
 
 type joinRequest struct {
-	EventID string `json:"event_id"`
-	RoomID  string `json:"room_id"`
+	EventID  string `json:"event_id"`
+	RoomID   string `json:"room_id"`
+	RoomName string `json:"room_name"` // optional human-readable name, stored in external_room_name
 }
 
 // JoinRoom handles POST /api/chat/join.
@@ -59,9 +60,9 @@ func (h *ChatHandler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Debug("[ChatHandler.JoinRoom] request", "event_id", eventID, "room_id", req.RoomID, "user_id", claims.UserID)
+	slog.Debug("[ChatHandler.JoinRoom] request", "event_id", eventID, "room_id", req.RoomID, "room_name", req.RoomName, "user_id", claims.UserID)
 
-	result, err := h.svc.GetOrCreateChildChat(r.Context(), eventID, req.RoomID)
+	result, err := h.svc.GetOrCreateChildChat(r.Context(), eventID, req.RoomID, req.RoomName)
 	if err != nil {
 		slog.Warn("[ChatHandler.JoinRoom] error", "err", err)
 		response.Error(w, http.StatusInternalServerError, "internal_error", "failed to join room")

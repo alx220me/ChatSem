@@ -89,13 +89,13 @@ func TestGetOrCreateChild_Idempotent(t *testing.T) {
 	repo := postgres.NewChatRepo(db)
 
 	t.Logf("[%s] stage: first GetOrCreateChild call", t.Name())
-	chat1, err := repo.GetOrCreateChild(context.Background(), eventID, "room-A", parentID)
+	chat1, err := repo.GetOrCreateChild(context.Background(), eventID, "room-A", "", parentID)
 	if err != nil {
 		t.Fatalf("[%s] first call: %v", t.Name(), err)
 	}
 
 	t.Logf("[%s] stage: second GetOrCreateChild call (idempotency)", t.Name())
-	chat2, err := repo.GetOrCreateChild(context.Background(), eventID, "room-A", parentID)
+	chat2, err := repo.GetOrCreateChild(context.Background(), eventID, "room-A", "", parentID)
 	if err != nil {
 		t.Fatalf("[%s] second call: %v", t.Name(), err)
 	}

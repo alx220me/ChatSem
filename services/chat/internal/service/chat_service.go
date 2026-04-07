@@ -28,31 +28,16 @@ type GetOrCreateChildResult struct {
 }
 
 // GetOrCreateChildChat returns an existing child chat for (eventID, roomID) or creates one.
-// Fast path: look up by (event_id, external_room_id) — return immediately if found.
-// Slow path: fetch parent → call GetOrCreateChild (INSERT ON CONFLICT DO NOTHING + SELECT).
-func (s *ChatService) GetOrCreateChildChat(ctx context.Context, eventID uuid.UUID, roomID string) (*GetOrCreateChildResult, error) {
-	slog.Debug("[ChatService.GetOrCreateChildChat] start", "event_id", eventID, "room_id", roomID)
+// Always goes through the upsert path so that external_room_name is kept up to date.
+func (s *ChatService) GetOrCreateChildChat(ctx context.Context, eventID uuid.UUID, roomID string, roomName string) (*GetOrCreateChildResult, error) {
+	slog.Debug("[ChatService.GetOrCreateChildChat] start", "event_id", eventID, "room_id", roomID, "room_name", roomName)
 
-	// Fast path: fetch all children and scan for matching room ID.
-	children, err := s.chats.ListByEventID(ctx, eventID)
-	if err != nil {
-		return nil, fmt.Errorf("ChatService.GetOrCreateChildChat list: %w", err)
-	}
-	for _, c := range children {
-		if c.Type == domain.TypeChild && c.ExternalRoomID == roomID {
-			slog.Debug("[ChatService.GetOrCreateChildChat] fast path hit", "event_id", eventID, "room_id", roomID, "chat_id", c.ID)
-			return &GetOrCreateChildResult{Chat: c, IsNew: false}, nil
-		}
-	}
-
-	// Slow path: need parent to create the child.
-	slog.Debug("[ChatService.GetOrCreateChildChat] slow path: creating", "event_id", eventID)
 	parent, err := s.chats.GetParentByEventID(ctx, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("ChatService.GetOrCreateChildChat get parent: %w", err)
 	}
 
-	child, err := s.chats.GetOrCreateChild(ctx, eventID, roomID, parent.ID)
+	child, err := s.chats.GetOrCreateChild(ctx, eventID, roomID, roomName, parent.ID)
 	if err != nil {
 		return nil, fmt.Errorf("ChatService.GetOrCreateChildChat create: %w", err)
 	}
@@ -63,8 +48,8 @@ func (s *ChatService) GetOrCreateChildChat(ctx context.Context, eventID uuid.UUI
 		slog.Debug("[ChatService.GetOrCreateChildChat] InitChatSeq skipped (likely already exists)", "chat_id", child.ID, "err", err)
 	}
 
-	slog.Info("[ChatService.GetOrCreateChildChat] child created", "chat_id", child.ID)
-	return &GetOrCreateChildResult{Chat: child, IsNew: true}, nil
+	slog.Info("[ChatService.GetOrCreateChildChat] upserted", "chat_id", child.ID, "room_name", child.ExternalRoomName)
+	return &GetOrCreateChildResult{Chat: child, IsNew: false}, nil
 }
 
 // GetParentChat returns the parent chat for an event.

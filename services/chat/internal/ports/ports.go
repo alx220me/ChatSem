@@ -17,7 +17,7 @@ type EventRepository interface {
 type ChatRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Chat, error)
 	GetParentByEventID(ctx context.Context, eventID uuid.UUID) (*domain.Chat, error)
-	GetOrCreateChild(ctx context.Context, eventID uuid.UUID, externalRoomID string, parentID uuid.UUID) (*domain.Chat, error)
+	GetOrCreateChild(ctx context.Context, eventID uuid.UUID, externalRoomID string, roomName string, parentID uuid.UUID) (*domain.Chat, error)
 	ListByEventID(ctx context.Context, eventID uuid.UUID) ([]*domain.Chat, error)
 	GetSettings(ctx context.Context, chatID uuid.UUID) ([]byte, error)
 	UpdateSettings(ctx context.Context, chatID uuid.UUID, settings []byte) error

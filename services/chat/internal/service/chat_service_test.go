@@ -16,7 +16,7 @@ import (
 type mockChatRepo struct {
 	listByEventID      func(ctx context.Context, eventID uuid.UUID) ([]*domain.Chat, error)
 	getParentByEventID func(ctx context.Context, eventID uuid.UUID) (*domain.Chat, error)
-	getOrCreateChild   func(ctx context.Context, eventID uuid.UUID, roomID string, parentID uuid.UUID) (*domain.Chat, error)
+	getOrCreateChild   func(ctx context.Context, eventID uuid.UUID, roomID string, roomName string, parentID uuid.UUID) (*domain.Chat, error)
 	getByID            func(ctx context.Context, id uuid.UUID) (*domain.Chat, error)
 	initChatSeq        func(ctx context.Context, chatID uuid.UUID) error
 }
@@ -27,8 +27,8 @@ func (m *mockChatRepo) ListByEventID(ctx context.Context, eventID uuid.UUID) ([]
 func (m *mockChatRepo) GetParentByEventID(ctx context.Context, eventID uuid.UUID) (*domain.Chat, error) {
 	return m.getParentByEventID(ctx, eventID)
 }
-func (m *mockChatRepo) GetOrCreateChild(ctx context.Context, eventID uuid.UUID, roomID string, parentID uuid.UUID) (*domain.Chat, error) {
-	return m.getOrCreateChild(ctx, eventID, roomID, parentID)
+func (m *mockChatRepo) GetOrCreateChild(ctx context.Context, eventID uuid.UUID, roomID string, roomName string, parentID uuid.UUID) (*domain.Chat, error) {
+	return m.getOrCreateChild(ctx, eventID, roomID, roomName, parentID)
 }
 func (m *mockChatRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Chat, error) {
 	return m.getByID(ctx, id)
@@ -46,45 +46,45 @@ func (m *mockChatRepo) UpdateSettings(ctx context.Context, chatID uuid.UUID, set
 	return nil
 }
 
-func TestGetOrCreateChildChat_FastPath(t *testing.T) {
+func TestGetOrCreateChildChat_UpsertWithRoomName(t *testing.T) {
 	eventID := uuid.New()
+	parentID := uuid.New()
 	roomID := "room-A"
-	existingChat := &domain.Chat{
-		ID:             uuid.New(),
-		EventID:        eventID,
-		Type:           domain.TypeChild,
-		ExternalRoomID: roomID,
+	roomName := "Main Hall"
+	expected := &domain.Chat{
+		ID:               uuid.New(),
+		EventID:          eventID,
+		Type:             domain.TypeChild,
+		ExternalRoomID:   roomID,
+		ExternalRoomName: roomName,
 	}
 
-	getParentCalled := false
+	var capturedRoomName string
 	repo := &mockChatRepo{
-		listByEventID: func(ctx context.Context, eID uuid.UUID) ([]*domain.Chat, error) {
-			return []*domain.Chat{existingChat}, nil
-		},
 		getParentByEventID: func(ctx context.Context, eID uuid.UUID) (*domain.Chat, error) {
-			getParentCalled = true
-			return nil, errors.New("should not be called")
+			return &domain.Chat{ID: parentID, Type: domain.TypeParent}, nil
+		},
+		getOrCreateChild: func(ctx context.Context, eID uuid.UUID, rID string, rName string, pID uuid.UUID) (*domain.Chat, error) {
+			capturedRoomName = rName
+			return expected, nil
 		},
 	}
 
 	svc := service.NewChatService(repo)
-	result, err := svc.GetOrCreateChildChat(context.Background(), eventID, roomID)
+	result, err := svc.GetOrCreateChildChat(context.Background(), eventID, roomID, roomName)
 	if err != nil {
 		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
 	}
-	if result.Chat.ID != existingChat.ID {
-		t.Errorf("[%s] expected chat_id=%s, got %s", t.Name(), existingChat.ID, result.Chat.ID)
+	if result.Chat.ID != expected.ID {
+		t.Errorf("[%s] expected chat_id=%s, got %s", t.Name(), expected.ID, result.Chat.ID)
 	}
-	if result.IsNew {
-		t.Errorf("[%s] expected IsNew=false on fast path", t.Name())
+	if capturedRoomName != roomName {
+		t.Errorf("[%s] expected room_name=%q passed to repo, got %q", t.Name(), roomName, capturedRoomName)
 	}
-	if getParentCalled {
-		t.Errorf("[%s] GetParentByEventID should not be called on fast path", t.Name())
-	}
-	t.Logf("[%s] assert: fast path returned chat_id=%s, IsNew=false", t.Name(), result.Chat.ID)
+	t.Logf("[%s] assert: upsert passed room_name=%q, chat_id=%s", t.Name(), capturedRoomName, result.Chat.ID)
 }
 
-func TestGetOrCreateChildChat_SlowPath(t *testing.T) {
+func TestGetOrCreateChildChat_CreateNewRoom(t *testing.T) {
 	eventID := uuid.New()
 	parentID := uuid.New()
 	roomID := "room-B"
@@ -96,14 +96,10 @@ func TestGetOrCreateChildChat_SlowPath(t *testing.T) {
 	}
 
 	repo := &mockChatRepo{
-		listByEventID: func(ctx context.Context, eID uuid.UUID) ([]*domain.Chat, error) {
-			// No children yet
-			return []*domain.Chat{}, nil
-		},
 		getParentByEventID: func(ctx context.Context, eID uuid.UUID) (*domain.Chat, error) {
 			return &domain.Chat{ID: parentID, Type: domain.TypeParent}, nil
 		},
-		getOrCreateChild: func(ctx context.Context, eID uuid.UUID, rID string, pID uuid.UUID) (*domain.Chat, error) {
+		getOrCreateChild: func(ctx context.Context, eID uuid.UUID, rID string, rName string, pID uuid.UUID) (*domain.Chat, error) {
 			if pID != parentID {
 				t.Errorf("[%s] expected parentID=%s, got %s", t.Name(), parentID, pID)
 			}
@@ -112,17 +108,14 @@ func TestGetOrCreateChildChat_SlowPath(t *testing.T) {
 	}
 
 	svc := service.NewChatService(repo)
-	result, err := svc.GetOrCreateChildChat(context.Background(), eventID, roomID)
+	result, err := svc.GetOrCreateChildChat(context.Background(), eventID, roomID, "")
 	if err != nil {
 		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
 	}
 	if result.Chat.ID != newChild.ID {
 		t.Errorf("[%s] expected chat_id=%s, got %s", t.Name(), newChild.ID, result.Chat.ID)
 	}
-	if !result.IsNew {
-		t.Errorf("[%s] expected IsNew=true on slow path", t.Name())
-	}
-	t.Logf("[%s] assert: slow path created chat_id=%s, IsNew=true", t.Name(), result.Chat.ID)
+	t.Logf("[%s] assert: new room created with chat_id=%s", t.Name(), result.Chat.ID)
 }
 
 func TestGetOrCreateChildChat_ConflictFallback(t *testing.T) {
@@ -133,21 +126,18 @@ func TestGetOrCreateChildChat_ConflictFallback(t *testing.T) {
 
 	createCalls := 0
 	repo := &mockChatRepo{
-		listByEventID: func(ctx context.Context, eID uuid.UUID) ([]*domain.Chat, error) {
-			return []*domain.Chat{}, nil
-		},
 		getParentByEventID: func(ctx context.Context, eID uuid.UUID) (*domain.Chat, error) {
 			return &domain.Chat{ID: parentID, Type: domain.TypeParent}, nil
 		},
-		getOrCreateChild: func(ctx context.Context, eID uuid.UUID, rID string, pID uuid.UUID) (*domain.Chat, error) {
+		getOrCreateChild: func(ctx context.Context, eID uuid.UUID, rID string, rName string, pID uuid.UUID) (*domain.Chat, error) {
 			createCalls++
-			// Simulate race: GetOrCreateChild still returns the winner (ON CONFLICT DO NOTHING + SELECT).
+			// Simulate race: repo returns the winner chat regardless.
 			return winner, nil
 		},
 	}
 
 	svc := service.NewChatService(repo)
-	result, err := svc.GetOrCreateChildChat(context.Background(), eventID, roomID)
+	result, err := svc.GetOrCreateChildChat(context.Background(), eventID, roomID, "")
 	if err != nil {
 		t.Fatalf("[%s] unexpected error: %v", t.Name(), err)
 	}
