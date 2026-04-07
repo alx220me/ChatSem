@@ -17,9 +17,10 @@ import (
 // --- mock MessageRepository ---
 
 type mockMessageRepo struct {
-	create   func(ctx context.Context, m *domain.Message) error
-	getByID  func(ctx context.Context, id uuid.UUID) (*domain.Message, error)
-	softDel  func(ctx context.Context, id uuid.UUID) error
+	create              func(ctx context.Context, m *domain.Message) error
+	getByID             func(ctx context.Context, id uuid.UUID) (*domain.Message, error)
+	softDel             func(ctx context.Context, id uuid.UUID) error
+	update              func(ctx context.Context, id uuid.UUID, newText string) error
 	getByChatIDAfterSeq func(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error)
 }
 
@@ -31,6 +32,12 @@ func (m *mockMessageRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Me
 }
 func (m *mockMessageRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	return m.softDel(ctx, id)
+}
+func (m *mockMessageRepo) Update(ctx context.Context, id uuid.UUID, newText string) error {
+	if m.update != nil {
+		return m.update(ctx, id, newText)
+	}
+	return nil
 }
 func (m *mockMessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error) {
 	if m.getByChatIDAfterSeq != nil {
@@ -259,4 +266,100 @@ func TestSoftDelete_ForeignUserForbidden(t *testing.T) {
 		t.Errorf("[%s] expected ErrForbidden, got %v", t.Name(), err)
 	}
 	t.Logf("[%s] assert: foreign user → ErrForbidden", t.Name())
+}
+
+// --- EditMessage tests ---
+
+func TestEditMessage_OwnerCanEdit(t *testing.T) {
+	ownerID := uuid.New()
+	msgID := uuid.New()
+	chatID := uuid.New()
+	now := time.Now()
+	updatedText := "updated text"
+
+	callCount := 0
+	msgRepo := &mockMessageRepo{
+		getByID: func(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+			callCount++
+			msg := &domain.Message{ID: msgID, ChatID: chatID, UserID: ownerID, Text: "original"}
+			if callCount > 1 {
+				// second call after update — return updated text and edited_at
+				msg.Text = updatedText
+				msg.EditedAt = &now
+			}
+			return msg, nil
+		},
+		update: func(ctx context.Context, id uuid.UUID, newText string) error {
+			if id != msgID {
+				t.Errorf("[%s] unexpected msgID: %s", t.Name(), id)
+			}
+			if newText != updatedText {
+				t.Errorf("[%s] unexpected text: %s", t.Name(), newText)
+			}
+			return nil
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	msg, err := svc.EditMessage(context.Background(), msgID, ownerID, updatedText)
+	if err != nil {
+		t.Fatalf("[%s] owner should be able to edit: %v", t.Name(), err)
+	}
+	if msg.Text != updatedText {
+		t.Errorf("[%s] expected text=%q, got %q", t.Name(), updatedText, msg.Text)
+	}
+	t.Logf("[%s] assert: owner edited message, text=%q", t.Name(), msg.Text)
+}
+
+func TestEditMessage_NonOwnerForbidden(t *testing.T) {
+	ownerID := uuid.New()
+	otherID := uuid.New()
+	msgID := uuid.New()
+
+	msgRepo := &mockMessageRepo{
+		getByID: func(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+			return &domain.Message{ID: msgID, UserID: ownerID, Text: "hello"}, nil
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	_, err := svc.EditMessage(context.Background(), msgID, otherID, "new text")
+	if !errors.Is(err, domain.ErrEditForbidden) {
+		t.Errorf("[%s] expected ErrEditForbidden, got %v", t.Name(), err)
+	}
+	t.Logf("[%s] assert: non-owner → ErrEditForbidden", t.Name())
+}
+
+func TestEditMessage_NotFound(t *testing.T) {
+	msgRepo := &mockMessageRepo{
+		getByID: func(ctx context.Context, id uuid.UUID) (*domain.Message, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := newSvc(msgRepo, &mockMuteRepo{})
+	_, err := svc.EditMessage(context.Background(), uuid.New(), uuid.New(), "text")
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("[%s] expected ErrNotFound, got %v", t.Name(), err)
+	}
+	t.Logf("[%s] assert: message not found → ErrNotFound", t.Name())
+}
+
+func TestEditMessage_EmptyText(t *testing.T) {
+	svc := newSvc(&mockMessageRepo{}, &mockMuteRepo{})
+	_, err := svc.EditMessage(context.Background(), uuid.New(), uuid.New(), "")
+	if !errors.Is(err, domain.ErrEmptyMessage) {
+		t.Errorf("[%s] expected ErrEmptyMessage, got %v", t.Name(), err)
+	}
+	t.Logf("[%s] assert: empty text → ErrEmptyMessage", t.Name())
+}
+
+func TestEditMessage_TooLongText(t *testing.T) {
+	long := make([]byte, 4097)
+	for i := range long {
+		long[i] = 'a'
+	}
+	svc := newSvc(&mockMessageRepo{}, &mockMuteRepo{})
+	_, err := svc.EditMessage(context.Background(), uuid.New(), uuid.New(), string(long))
+	if !errors.Is(err, domain.ErrMessageTooLong) {
+		t.Errorf("[%s] expected ErrMessageTooLong, got %v", t.Name(), err)
+	}
+	t.Logf("[%s] assert: 4097-char text → ErrMessageTooLong", t.Name())
 }

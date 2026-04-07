@@ -23,9 +23,11 @@ function makeMsg(overrides: Partial<Message> = {}): Message {
 
 describe('MessageList', () => {
   const onReply = vi.fn()
+  const onEdit = vi.fn()
 
   beforeEach(() => {
     onReply.mockClear()
+    onEdit.mockClear()
   })
 
   it('renders a list of messages', () => {
@@ -106,5 +108,111 @@ describe('MessageList', () => {
     const msgDiv = screen.getByText('Hello world').closest('[data-seq]')!
     await userEvent.hover(msgDiv)
     expect(screen.queryByTitle('Ответить')).not.toBeInTheDocument()
+  })
+
+  // --- Edit tests ---
+
+  it('shows edit button for own messages', async () => {
+    const msg = makeMsg({ userId: 'user-1', seq: 1 })
+    render(
+      <MessageList
+        messages={[msg]}
+        loading={false}
+        currentUserId="user-1"
+        onReply={onReply}
+        onEdit={onEdit}
+      />,
+    )
+    const msgDiv = screen.getByText('Hello world').closest('[data-seq]')!
+    await userEvent.hover(msgDiv)
+    expect(screen.getByTitle('Редактировать сообщение')).toBeInTheDocument()
+  })
+
+  it('does not show edit button for other users messages', async () => {
+    const msg = makeMsg({ userId: 'other-user', seq: 1 })
+    render(
+      <MessageList
+        messages={[msg]}
+        loading={false}
+        currentUserId="user-1"
+        onReply={onReply}
+        onEdit={onEdit}
+      />,
+    )
+    const msgDiv = screen.getByText('Hello world').closest('[data-seq]')!
+    await userEvent.hover(msgDiv)
+    expect(screen.queryByTitle('Редактировать сообщение')).not.toBeInTheDocument()
+  })
+
+  it('clicking edit button activates inline edit mode', async () => {
+    const msg = makeMsg({ userId: 'user-1', seq: 1, text: 'Original text' })
+    render(
+      <MessageList
+        messages={[msg]}
+        loading={false}
+        currentUserId="user-1"
+        onReply={onReply}
+        onEdit={onEdit}
+      />,
+    )
+    const msgDiv = screen.getByText('Original text').closest('[data-seq]')!
+    await userEvent.hover(msgDiv)
+    await userEvent.click(screen.getByTitle('Редактировать сообщение'))
+    const textarea = screen.getByRole('textbox')
+    expect(textarea).toBeInTheDocument()
+    expect((textarea as HTMLTextAreaElement).value).toBe('Original text')
+  })
+
+  it('pressing Enter in edit mode calls onEdit with new text', async () => {
+    onEdit.mockResolvedValue(undefined)
+    const msg = makeMsg({ userId: 'user-1', seq: 1, text: 'Original text' })
+    render(
+      <MessageList
+        messages={[msg]}
+        loading={false}
+        currentUserId="user-1"
+        onReply={onReply}
+        onEdit={onEdit}
+      />,
+    )
+    const msgDiv = screen.getByText('Original text').closest('[data-seq]')!
+    await userEvent.hover(msgDiv)
+    await userEvent.click(screen.getByTitle('Редактировать сообщение'))
+    const textarea = screen.getByRole('textbox')
+    await userEvent.clear(textarea)
+    await userEvent.type(textarea, 'Updated text')
+    await userEvent.keyboard('{Enter}')
+    expect(onEdit).toHaveBeenCalledWith('msg-1', 'Updated text')
+  })
+
+  it('pressing Escape in edit mode cancels without calling onEdit', async () => {
+    const msg = makeMsg({ userId: 'user-1', seq: 1, text: 'Original text' })
+    render(
+      <MessageList
+        messages={[msg]}
+        loading={false}
+        currentUserId="user-1"
+        onReply={onReply}
+        onEdit={onEdit}
+      />,
+    )
+    const msgDiv = screen.getByText('Original text').closest('[data-seq]')!
+    await userEvent.hover(msgDiv)
+    await userEvent.click(screen.getByTitle('Редактировать сообщение'))
+    await userEvent.keyboard('{Escape}')
+    expect(onEdit).not.toHaveBeenCalled()
+    expect(screen.getByText('Original text')).toBeInTheDocument()
+  })
+
+  it('shows "(изм.)" label for edited messages', () => {
+    const msg = makeMsg({ editedAt: new Date().toISOString() })
+    render(<MessageList messages={[msg]} loading={false} onReply={onReply} />)
+    expect(screen.getByText('(изм.)')).toBeInTheDocument()
+  })
+
+  it('does not show "(изм.)" label for non-edited messages', () => {
+    const msg = makeMsg({ editedAt: undefined })
+    render(<MessageList messages={[msg]} loading={false} onReply={onReply} />)
+    expect(screen.queryByText('(изм.)')).not.toBeInTheDocument()
   })
 })

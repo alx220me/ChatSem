@@ -73,6 +73,9 @@ func (m *pollMockMessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID
 	return nil, nil
 }
 func (m *pollMockMessageRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *pollMockMessageRepo) Update(ctx context.Context, id uuid.UUID, newText string) error {
+	return nil
+}
 
 // buildPollRoute wraps PollHandler in Auth middleware and chi router for testing.
 func buildPollRoute(pollH *handler.PollHandler) http.Handler {
