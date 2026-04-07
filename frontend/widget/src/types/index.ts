@@ -44,7 +44,12 @@ export interface PollResponse {
 }
 
 export interface WidgetConfig {
-  containerId: string
+  /**
+   * ID of the host-page element to mount into.
+   * In floating mode this field is optional — if omitted or the element is not found,
+   * the widget creates its own <div id="chatsem-widget"> and appends it to <body>.
+   */
+  containerId?: string
   eventId: string
   /** Static JWT token. Use either this or tokenProvider, not both. */
   token?: string
@@ -74,4 +79,10 @@ export interface WidgetConfig {
    * After the user drags the widget, position is stored in React state.
    */
   defaultPosition?: { x: number; y: number }
+  /**
+   * Initial size of the floating window in pixels.
+   * Defaults to 360 × 520. The user can resize by dragging the edges/corners.
+   * Min: 240 × 280. Max: 900 × 900.
+   */
+  defaultSize?: { w: number; h: number }
 }
