@@ -149,6 +149,20 @@ func (s *MessageService) GetMessages(ctx context.Context, chatID uuid.UUID, afte
 	return msgs, nil
 }
 
+// GetMessagesBefore returns up to limit messages with seq < beforeSeq in ascending order.
+func (s *MessageService) GetMessagesBefore(ctx context.Context, chatID uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error) {
+	slog.Debug("[MessageService.GetMessagesBefore] query", "chat_id", chatID, "before_seq", beforeSeq, "limit", limit)
+	if limit > 100 {
+		limit = 100
+	}
+	msgs, err := s.messages.GetByChatIDBeforeSeq(ctx, chatID, beforeSeq, limit)
+	if err != nil {
+		return nil, fmt.Errorf("MessageService.GetMessagesBefore: %w", err)
+	}
+	slog.Debug("[MessageService.GetMessagesBefore] fetched", "chat_id", chatID, "count", len(msgs))
+	return msgs, nil
+}
+
 // SoftDelete soft-deletes a message if the requestor is the owner or has a moderator/admin role.
 func (s *MessageService) SoftDelete(ctx context.Context, msgID, requestorID uuid.UUID, role string) error {
 	slog.Debug("[MessageService.SoftDelete] deleting", "msg_id", msgID, "by", requestorID, "role", role)

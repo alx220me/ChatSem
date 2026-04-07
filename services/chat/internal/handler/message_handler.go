@@ -110,6 +110,15 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	beforeSeq := int64(0)
+	if s := r.URL.Query().Get("before"); s != "" {
+		beforeSeq, err = strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			response.Error(w, http.StatusBadRequest, "bad_request", "invalid before parameter")
+			return
+		}
+	}
+
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
@@ -118,16 +127,21 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	slog.Debug("[MessageHandler.List] request", "chat_id", chatID, "after_seq", afterSeq, "limit", limit)
+	slog.Debug("[MessageHandler.List] request",
+		"chat_id", chatID, "after_seq", afterSeq, "before_seq", beforeSeq, "limit", limit)
 
 	var msgs []*domain.Message
 	var listErr error
-	if afterSeq == 0 {
-		// Initial load: return the most recent messages in chronological order.
-		msgs, listErr = h.svc.ListMessages(r.Context(), chatID, limit)
-	} else {
+	switch {
+	case beforeSeq > 0:
+		// Backward pagination: load older messages before a known seq.
+		msgs, listErr = h.svc.GetMessagesBefore(r.Context(), chatID, beforeSeq, limit)
+	case afterSeq > 0:
 		// Incremental load: return messages after a known seq.
 		msgs, listErr = h.svc.GetMessages(r.Context(), chatID, afterSeq, limit)
+	default:
+		// Initial load: return the most recent messages in chronological order.
+		msgs, listErr = h.svc.ListMessages(r.Context(), chatID, limit)
 	}
 	if listErr != nil {
 		slog.Warn("[MessageHandler.List] error", "err", listErr)
@@ -135,7 +149,10 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]interface{}{"messages": msgs})
+	// has_more: if we got exactly limit messages there are likely more older ones available.
+	hasMore := len(msgs) == limit
+	slog.Info("[MessageHandler.List] returning", "chat_id", chatID, "count", len(msgs), "has_more", hasMore)
+	response.JSON(w, http.StatusOK, map[string]interface{}{"messages": msgs, "has_more": hasMore})
 }
 
 // Delete handles DELETE /api/chat/messages/{msgID}.

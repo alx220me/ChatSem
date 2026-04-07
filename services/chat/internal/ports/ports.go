@@ -29,6 +29,7 @@ type MessageRepository interface {
 	Create(ctx context.Context, m *domain.Message) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Message, error)
 	GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]*domain.Message, error)
+	GetByChatIDBeforeSeq(ctx context.Context, chatID uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error)
 	ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error
 	Update(ctx context.Context, id uuid.UUID, newText string) error

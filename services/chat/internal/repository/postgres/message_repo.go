@@ -73,6 +73,40 @@ func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID,
 	return msgs, nil
 }
 
+// GetByChatIDBeforeSeq returns messages in chatID with seq < beforeSeq, ordered ascending (oldest first).
+// Fetches DESC then reverses — yields chronological order for prepending to the message list.
+// Reply preview fields are populated via LEFT JOIN.
+func (r *MessageRepo) GetByChatIDBeforeSeq(ctx context.Context, chatID uuid.UUID, beforeSeq int64, limit int) ([]*domain.Message, error) {
+	slog.Debug("[MessageRepo.GetByChatIDBeforeSeq] query",
+		"chat_id", chatID, "before_seq", beforeSeq, "limit", limit)
+	rows, err := r.db.Query(ctx, `
+		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at, m.edited_at,
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, ''), rm.created_at
+		FROM messages m
+		LEFT JOIN users u  ON u.id  = m.user_id
+		LEFT JOIN messages rm ON rm.id = m.reply_to_id
+		LEFT JOIN users ru ON ru.id = rm.user_id
+		WHERE m.chat_id = $1 AND m.seq < $2 AND m.deleted_at IS NULL
+		ORDER BY m.seq DESC
+		LIMIT $3`,
+		chatID, beforeSeq, limit)
+	if err != nil {
+		return nil, fmt.Errorf("MessageRepo.GetByChatIDBeforeSeq: %w", err)
+	}
+	defer rows.Close()
+
+	msgs, err := scanMessages(rows)
+	if err != nil {
+		return nil, err
+	}
+	// Reverse DESC→ASC so oldest appears first (natural chronological order for prepend)
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+	slog.Debug("[MessageRepo.GetByChatIDBeforeSeq] fetched", "chat_id", chatID, "count", len(msgs))
+	return msgs, nil
+}
+
 // ListByChatID returns messages for chatID in descending order (most recent first).
 // Reply preview fields are populated via LEFT JOIN.
 func (r *MessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]*domain.Message, error) {
