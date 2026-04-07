@@ -10,14 +10,22 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
 
   const baseUrl = import.meta.env.VITE_WIDGET_BASE_URL ?? 'http://localhost:5173'
 
-  const snippet = `<div id="chat-widget"></div>
-<script>
-  window.ChatWidget = {
-    eventId: "${eventId}",
-    token: "YOUR_JWT_TOKEN_HERE",
-  };
-</script>
-<script src="${baseUrl}/widget.js" defer></script>`
+  const snippet = `<div id="chat-widget" style="height:500px"></div>
+<script src="${baseUrl}/widget.js" defer></script>
+<script defer>
+  window.ChatSem.init({
+    containerId: 'chat-widget',
+    eventId: '${eventId}',
+    // roomId: 'my-room',  // optional: embed a specific room
+    tokenProvider: async function() {
+      // Call YOUR backend — it holds the API secret and calls ChatSem auth:
+      //   POST /api/auth/token  Authorization: Bearer <api_secret>
+      const res = await fetch('/your-server/chat-token');
+      const data = await res.json();
+      return data.token;
+    },
+  });
+</script>`
 
   const handleCopy = useCallback(() => {
     if (navigator.clipboard) {
@@ -87,11 +95,15 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
       >
         <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>Widget Embed Code</h2>
         <p style={{ margin: '0 0 12px', fontSize: 14, color: '#6b7280' }}>
-          Paste this snippet into your page. Replace{' '}
+          Paste this snippet into your page. Implement{' '}
           <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>
-            YOUR_JWT_TOKEN_HERE
+            /your-server/chat-token
           </code>{' '}
-          with the JWT generated on your server.
+          on your backend — it should call the ChatSem auth API with your API secret and return{' '}
+          <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>
+            {'{'}token{'}'}
+          </code>.
+          The widget calls <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>tokenProvider</code> on init and automatically on token expiry.
         </p>
         <pre
           style={{
