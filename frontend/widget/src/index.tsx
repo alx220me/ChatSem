@@ -12,23 +12,33 @@ declare global {
 }
 
 window.ChatSem = {
-  init(config: WidgetConfig) {
+  async init(config: WidgetConfig) {
     const container = document.getElementById(config.containerId)
     if (!container) {
       console.error('[ChatSem] container not found:', config.containerId)
       return
     }
 
-    // Per-instance token closure — supports multiple widgets on the same page
-    let instanceToken = config.token
-    const getInstanceToken = () => instanceToken
+    // Resolve the initial token: tokenProvider takes priority over static token.
+    let instanceToken: string
+    if (config.tokenProvider) {
+      instanceToken = await config.tokenProvider()
+    } else if (config.token) {
+      instanceToken = config.token
+    } else {
+      console.error('[ChatSem] provide either token or tokenProvider')
+      return
+    }
 
+    // Per-instance token closure — supports multiple widgets on the same page.
+    // tokenProvider is used for both init and refresh; onTokenExpired is the legacy fallback.
+    const refreshSource = config.tokenProvider ?? config.onTokenExpired
     const api = new ApiClient(
       '/api',
-      getInstanceToken,
-      config.onTokenExpired
+      () => instanceToken,
+      refreshSource
         ? async () => {
-            const newToken = await config.onTokenExpired!()
+            const newToken = await refreshSource()
             instanceToken = newToken
             return newToken
           }

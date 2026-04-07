@@ -46,7 +46,15 @@ export interface PollResponse {
 export interface WidgetConfig {
   containerId: string
   eventId: string
-  token: string
-  roomId?: string
+  /** Static JWT token. Use either this or tokenProvider, not both. */
+  token?: string
+  /**
+   * Called on init and on every 401 to obtain a fresh JWT.
+   * The widget handles the initial fetch and all subsequent refreshes automatically.
+   * Replaces the token + onTokenExpired pair.
+   */
+  tokenProvider?: () => Promise<string>
+  /** @deprecated Use tokenProvider instead. Kept for backward compatibility. */
   onTokenExpired?: () => Promise<string>
+  roomId?: string
 }

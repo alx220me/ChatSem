@@ -66,9 +66,6 @@
 
   const NAMES = ['Алексей','Мария','Иван','Анна','Дмитрий','Елена','Сергей','Ольга','Андрей','Татьяна'];
 
-  // Store credentials per slot for token refresh
-  const credentials = {};
-
   function randomName() {
     return NAMES[Math.floor(Math.random() * NAMES.length)];
   }
@@ -113,23 +110,16 @@
     const statusEl   = document.getElementById('status' + n);
 
     statusEl.className = 'status ok';
-    statusEl.textContent = 'Получаем токен...';
+    statusEl.textContent = 'Подключаемся...';
 
     try {
-      const token = await fetchToken(secret, externalId, name);
-
-      // Store credentials for token refresh
-      credentials[n] = { secret, externalId, name };
-
-      window.ChatSem.init({
+      await window.ChatSem.init({
         containerId: 'chat' + n,
         eventId: EVENT_ID,
-        token: token,
         roomId: ROOM_ID,
-        onTokenExpired: async () => {
-          const c = credentials[n];
-          return fetchToken(c.secret, c.externalId, c.name);
-        },
+        // tokenProvider вызывается при инициализации и при каждом истечении токена.
+        // Здесь вся логика получения/обновления токена — не нужны отдельные token и onTokenExpired.
+        tokenProvider: () => fetchToken(secret, externalId, name),
       });
 
       statusEl.textContent = `✓ Подключён как ${name}`;
