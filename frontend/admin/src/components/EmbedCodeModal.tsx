@@ -1,0 +1,145 @@
+import React, { useCallback, useEffect, useState } from 'react'
+
+interface EmbedCodeModalProps {
+  eventId: string
+  onClose: () => void
+}
+
+export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React.ReactElement {
+  const [copied, setCopied] = useState(false)
+
+  const baseUrl = import.meta.env.VITE_WIDGET_BASE_URL ?? 'http://localhost:5173'
+
+  const snippet = `<div id="chat-widget"></div>
+<script>
+  window.ChatWidget = {
+    eventId: "${eventId}",
+    token: "YOUR_JWT_TOKEN_HERE",
+  };
+</script>
+<script src="${baseUrl}/widget.js" defer></script>`
+
+  const handleCopy = useCallback(() => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(snippet).then(() => {
+        if (import.meta.env.DEV) {
+          console.info('[EmbedCodeModal] snippet copied', 'event_id', eventId)
+        }
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }).catch(() => fallbackCopy(snippet))
+    } else {
+      fallbackCopy(snippet)
+    }
+  }, [snippet, eventId])
+
+  function fallbackCopy(text: string) {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    try {
+      document.execCommand('copy')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } finally {
+      document.body.removeChild(ta)
+    }
+  }
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.debug('[EmbedCodeModal] opened', 'event_id', eventId)
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [eventId, onClose])
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: 8,
+          padding: 24,
+          maxWidth: 560,
+          width: '100%',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>Widget Embed Code</h2>
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: '#6b7280' }}>
+          Paste this snippet into your page. Replace{' '}
+          <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>
+            YOUR_JWT_TOKEN_HERE
+          </code>{' '}
+          with the JWT generated on your server.
+        </p>
+        <pre
+          style={{
+            background: '#f3f4f6',
+            padding: 12,
+            borderRadius: 4,
+            fontFamily: 'monospace',
+            fontSize: 12,
+            overflowX: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            marginBottom: 16,
+            color: '#111827',
+          }}
+        >
+          {snippet}
+        </pre>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 14,
+              backgroundColor: '#fff',
+            }}
+          >
+            Close
+          </button>
+          <button
+            onClick={handleCopy}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 14,
+              backgroundColor: copied ? '#16a34a' : '#2563eb',
+              color: '#fff',
+              transition: 'background-color 0.15s',
+            }}
+          >
+            {copied ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

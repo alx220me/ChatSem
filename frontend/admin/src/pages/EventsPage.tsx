@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { EmbedCodeModal } from '../components/EmbedCodeModal'
 import type { Event } from '../types'
 
 interface CreateEventModalProps {
@@ -165,6 +166,7 @@ export function EventsPage(): React.ReactElement {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [embedEventId, setEmbedEventId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!api) return
@@ -210,6 +212,7 @@ export function EventsPage(): React.ReactElement {
               <th style={thStyle}>ID</th>
               <th style={thStyle}>Allowed Origin</th>
               <th style={thStyle}>Created At</th>
+              <th style={thStyle}>Code</th>
             </tr>
           </thead>
           <tbody>
@@ -233,11 +236,19 @@ export function EventsPage(): React.ReactElement {
                 </td>
                 <td style={tdStyle}>{ev.allowedOrigin}</td>
                 <td style={tdStyle}>{new Date(ev.createdAt).toLocaleString()}</td>
+                <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setEmbedEventId(ev.id)}
+                    style={btnSecondaryStyle}
+                  >
+                    Code
+                  </button>
+                </td>
               </tr>
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 32 }}>
+                <td colSpan={5} style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 32 }}>
                   No events yet
                 </td>
               </tr>
@@ -248,6 +259,10 @@ export function EventsPage(): React.ReactElement {
 
       {showModal && (
         <CreateEventModal onClose={() => setShowModal(false)} onCreated={handleCreated} />
+      )}
+
+      {embedEventId && (
+        <EmbedCodeModal eventId={embedEventId} onClose={() => setEmbedEventId(null)} />
       )}
     </div>
   )
