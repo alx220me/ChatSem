@@ -5,6 +5,7 @@ import type { Chat, Message, SendResponse } from '../types'
 interface UseChatResult {
   chat: Chat | null
   messages: Message[]
+  initialHasMore: boolean
   loading: boolean
   error: string | null
   sendMessage: (text: string, replyToId?: string) => Promise<SendResponse>
@@ -17,6 +18,7 @@ export function useChat(
 ): UseChatResult {
   const [chat, setChat] = useState<Chat | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [initialHasMore, setInitialHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,9 +57,10 @@ export function useChat(
         if (cancelled) return
         setChat(selected)
 
-        const msgs = await api.getMessages(selected.id, 50)
+        const result = await api.getMessages(selected.id, 50)
         if (cancelled) return
-        setMessages(msgs)
+        setMessages(result.messages)
+        setInitialHasMore(result.has_more)
       } catch (err) {
         if (cancelled) return
         const msg = err instanceof Error ? err.message : String(err)
@@ -89,5 +92,5 @@ export function useChat(
     [api, chat],
   )
 
-  return { chat, messages, loading, error, sendMessage }
+  return { chat, messages, initialHasMore, loading, error, sendMessage }
 }

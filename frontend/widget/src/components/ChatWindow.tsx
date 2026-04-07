@@ -13,7 +13,7 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement {
-  const { chat, messages, loading, error, sendMessage } = useChat(
+  const { chat, messages, initialHasMore, loading, error, sendMessage } = useChat(
     api,
     config.eventId,
     config.roomId,
@@ -23,18 +23,42 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   const [allMessages, setAllMessages] = useState<Message[]>([])
   const [initialized, setInitialized] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // Merge initial messages from useChat into allMessages once loaded
   React.useEffect(() => {
     if (!loading && !initialized) {
       setAllMessages(messages)
+      setHasMore(initialHasMore)
       setInitialized(true)
 
       if (import.meta.env.DEV && chat) {
-        console.debug('[ChatWindow] mounted', 'chat_id', chat.id)
+        console.debug('[ChatWindow] mounted', 'chat_id', chat.id, 'has_more', initialHasMore)
       }
     }
-  }, [loading, initialized, messages, chat])
+  }, [loading, initialized, messages, initialHasMore, chat])
+
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasMore || !chat) return
+    const oldestSeq = allMessages[0]?.seq ?? 0
+    if (oldestSeq <= 0) return
+    setLoadingMore(true)
+    try {
+      const result = await api.getMessages(chat.id, 50, oldestSeq)
+      console.debug('[ChatWindow] load older', oldestSeq, 'has_more', result.has_more)
+      setAllMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id))
+        const fresh = result.messages.filter((m) => !existingIds.has(m.id))
+        return [...fresh, ...prev]
+      })
+      setHasMore(result.has_more)
+    } catch (err) {
+      console.warn('[ChatWindow] loadOlderMessages failed', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [api, chat, allMessages, hasMore, loadingMore])
 
   const handlePollMessages = useCallback((incoming: Message[], deletedIds: string[], editedMessages: EditedMessage[]) => {
     setPollError(null)
@@ -275,6 +299,8 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             onBan={handleBan}
             onMute={handleMute}
             onReply={setReplyingTo}
+            onLoadMore={hasMore ? loadOlderMessages : undefined}
+            loadingMore={loadingMore}
           />
           <MessageInput
             onSend={handleSend}

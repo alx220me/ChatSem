@@ -95,12 +95,14 @@ export class ApiClient {
     await this.request<unknown>('POST', `/chat/join`, { event_id: eventId, room_id: roomId })
   }
 
-  async getMessages(chatId: string, limit: number): Promise<Message[]> {
-    const res = await this.request<{ messages: Message[] }>(
-      'GET',
-      `/chat/${chatId}/messages?limit=${limit}`,
-    )
-    return res.messages ?? []
+  async getMessages(
+    chatId: string,
+    limit: number,
+    before?: number,
+  ): Promise<{ messages: Message[]; has_more: boolean }> {
+    const url = `/chat/${chatId}/messages?limit=${limit}${before != null ? `&before=${before}` : ''}`
+    const res = await this.request<{ messages: Message[]; has_more: boolean }>('GET', url)
+    return { messages: res.messages ?? [], has_more: res.has_more ?? false }
   }
 
   async sendMessage(chatId: string, text: string, replyToId?: string): Promise<SendResponse> {

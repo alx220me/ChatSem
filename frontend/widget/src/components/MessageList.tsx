@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Message } from '../types'
 import { UserAvatar } from './UserAvatar'
 
@@ -12,6 +12,8 @@ interface MessageListProps {
   onMute?: (userId: string, reason: string) => void
   onReply?: (msg: Message) => void
   onEdit?: (msgId: string, newText: string) => Promise<void>
+  onLoadMore?: () => void
+  loadingMore?: boolean
 }
 
 interface ModTarget {
@@ -98,9 +100,16 @@ export function MessageList({
   onMute,
   onReply,
   onEdit,
+  onLoadMore,
+  loadingMore,
 }: MessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const topSentinelRef = useRef<HTMLDivElement>(null)
+  const loadingTriggeredRef = useRef(false)
+  const prevFirstMsgIdRef = useRef<string | undefined>(undefined)
+  const savedScrollHeightRef = useRef(0)
+  const isNearBottomRef = useRef(true)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [modTarget, setModTarget] = useState<ModTarget | null>(null)
   const [modReason, setModReason] = useState('')
@@ -109,9 +118,55 @@ export function MessageList({
 
   const isMod = currentUserRole === 'moderator' || currentUserRole === 'admin'
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  // Scroll management: preserve position on prepend, auto-scroll on append only when near bottom
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!list) return
+
+    const firstMsgId = messages[0]?.id
+
+    if (prevFirstMsgIdRef.current !== undefined && firstMsgId !== prevFirstMsgIdRef.current) {
+      // First message changed — prepend happened, preserve scroll position
+      const delta = list.scrollHeight - savedScrollHeightRef.current
+      if (delta > 0) {
+        list.scrollTop += delta
+      }
+    } else if (isNearBottomRef.current) {
+      // New message appended or initial load — auto-scroll only if user was near bottom
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+
+    prevFirstMsgIdRef.current = firstMsgId
+    savedScrollHeightRef.current = list.scrollHeight
+    isNearBottomRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < 150
   }, [messages])
+
+  // IntersectionObserver on top sentinel to trigger loadOlderMessages
+  useEffect(() => {
+    const sentinel = topSentinelRef.current
+    if (!sentinel || !onLoadMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry.isIntersecting && !loadingTriggeredRef.current) {
+          loadingTriggeredRef.current = true
+          console.debug('[MessageList] top sentinel visible — load older')
+          onLoadMore()
+        }
+      },
+      { threshold: 0.1 },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [onLoadMore])
+
+  // Reset trigger when loading finishes so next scroll-to-top triggers again
+  useEffect(() => {
+    if (!loadingMore) {
+      loadingTriggeredRef.current = false
+    }
+  }, [loadingMore])
 
   function handleModConfirm() {
     if (!modTarget) return
@@ -167,6 +222,23 @@ export function MessageList({
 
   return (
     <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 0', position: 'relative' }}>
+      {/* Top sentinel for IntersectionObserver — triggers loadOlderMessages when visible */}
+      <div ref={topSentinelRef} style={{ height: 1 }} />
+
+      {/* Spinner shown while older messages are loading */}
+      {loadingMore && (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '6px 0',
+            fontSize: 12,
+            color: '#9ca3af',
+          }}
+        >
+          Загрузка...
+        </div>
+      )}
+
       {messages.map((msg) => {
         const isOwn = msg.userId === currentUserId
         const canDelete = (isOwn || isMod) && msg.seq !== -1
