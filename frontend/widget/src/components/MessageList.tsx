@@ -2,6 +2,9 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Message } from '../types'
 import { UserAvatar } from './UserAvatar'
 
+/** Distance from bottom (px) within which auto-scroll activates on new messages. */
+const NEAR_BOTTOM_THRESHOLD = 150
+
 interface MessageListProps {
   messages: Message[]
   loading: boolean
@@ -14,6 +17,8 @@ interface MessageListProps {
   onEdit?: (msgId: string, newText: string) => Promise<void>
   onLoadMore?: () => void
   loadingMore?: boolean
+  /** Increment to force-scroll to bottom (e.g. when user sends a message). */
+  scrollToBottomTrigger?: number
 }
 
 interface ModTarget {
@@ -102,6 +107,7 @@ export function MessageList({
   onEdit,
   onLoadMore,
   loadingMore,
+  scrollToBottomTrigger,
 }: MessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -132,14 +138,25 @@ export function MessageList({
         list.scrollTop += delta
       }
     } else if (isNearBottomRef.current) {
-      // New message appended or initial load — auto-scroll only if user was near bottom
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      // New message appended or initial load — scroll to bottom synchronously (before paint)
+      // so the user never sees the list at scrollTop=0. Smooth animation is avoided here
+      // because it defers the actual scroll to animation frames, causing a visible flash.
+      list.scrollTop = list.scrollHeight
     }
 
     prevFirstMsgIdRef.current = firstMsgId
     savedScrollHeightRef.current = list.scrollHeight
-    isNearBottomRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < 150
+    // NOTE: isNearBottomRef is kept up-to-date by the onScroll handler below,
+    // not here — smooth scrollIntoView doesn't update scrollTop synchronously,
+    // so computing it here would give a stale position and break auto-scroll.
   }, [messages])
+
+  // Track whether user is near the bottom — updated on every manual scroll
+  function handleListScroll() {
+    const list = listRef.current
+    if (!list) return
+    isNearBottomRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_BOTTOM_THRESHOLD
+  }
 
   // IntersectionObserver on top sentinel to trigger loadOlderMessages
   useEffect(() => {
@@ -167,6 +184,15 @@ export function MessageList({
       loadingTriggeredRef.current = false
     }
   }, [loadingMore])
+
+  // Force-scroll to bottom when user sends a message (regardless of current scroll position)
+  useEffect(() => {
+    if (!scrollToBottomTrigger) return
+    const list = listRef.current
+    if (!list) return
+    isNearBottomRef.current = true
+    list.scrollTop = list.scrollHeight
+  }, [scrollToBottomTrigger])
 
   function handleModConfirm() {
     if (!modTarget) return
@@ -221,7 +247,7 @@ export function MessageList({
   }
 
   return (
-    <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 0', position: 'relative' }}>
+    <div ref={listRef} onScroll={handleListScroll} style={{ flex: 1, overflowY: 'auto', padding: '8px 0', position: 'relative' }}>
       {/* Top sentinel for IntersectionObserver — triggers loadOlderMessages when visible */}
       <div ref={topSentinelRef} style={{ height: 1 }} />
 

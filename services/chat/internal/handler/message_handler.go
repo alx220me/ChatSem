@@ -150,6 +150,7 @@ func (h *MessageHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// has_more: if we got exactly limit messages there are likely more older ones available.
+	// Meaningful for before/initial cases; ignored by poll (after) clients.
 	hasMore := len(msgs) == limit
 	slog.Info("[MessageHandler.List] returning", "chat_id", chatID, "count", len(msgs), "has_more", hasMore)
 	response.JSON(w, http.StatusOK, map[string]interface{}{"messages": msgs, "has_more": hasMore})

@@ -100,7 +100,7 @@ export class ApiClient {
     limit: number,
     before?: number,
   ): Promise<{ messages: Message[]; has_more: boolean }> {
-    const url = `/chat/${chatId}/messages?limit=${limit}${before != null ? `&before=${before}` : ''}`
+    const url = `/chat/${chatId}/messages?limit=${limit}${before != null && before > 0 ? `&before=${before}` : ''}`
     const res = await this.request<{ messages: Message[]; has_more: boolean }>('GET', url)
     return { messages: res.messages ?? [], has_more: res.has_more ?? false }
   }

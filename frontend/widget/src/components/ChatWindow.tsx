@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiClient } from '../api/client'
 import type { Message, EditedMessage, WidgetConfig } from '../types'
 import { useChat } from '../hooks/useChat'
@@ -25,6 +25,9 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [scrollToBottomTrigger, setScrollToBottomTrigger] = useState(0)
+  const allMessagesRef = useRef(allMessages)
+  useEffect(() => { allMessagesRef.current = allMessages }, [allMessages])
 
   // Merge initial messages from useChat into allMessages once loaded
   React.useEffect(() => {
@@ -41,7 +44,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore || !chat) return
-    const oldestSeq = allMessages[0]?.seq ?? 0
+    const oldestSeq = allMessagesRef.current[0]?.seq ?? 0
     if (oldestSeq <= 0) return
     setLoadingMore(true)
     try {
@@ -58,7 +61,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     } finally {
       setLoadingMore(false)
     }
-  }, [api, chat, allMessages, hasMore, loadingMore])
+  }, [api, chat, hasMore, loadingMore])
 
   const handlePollMessages = useCallback((incoming: Message[], deletedIds: string[], editedMessages: EditedMessage[]) => {
     setPollError(null)
@@ -170,6 +173,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         replyToUserName: replyingTo?.userName,
       }
       setAllMessages((prev) => [...prev, optimistic])
+      setScrollToBottomTrigger((n) => n + 1)
       setReplyingTo(null)
 
       try {
@@ -301,6 +305,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             onReply={setReplyingTo}
             onLoadMore={hasMore ? loadOlderMessages : undefined}
             loadingMore={loadingMore}
+            scrollToBottomTrigger={scrollToBottomTrigger}
           />
           <MessageInput
             onSend={handleSend}
