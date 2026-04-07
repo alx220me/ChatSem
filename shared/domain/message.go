@@ -19,8 +19,9 @@ type Message struct {
 	EditedAt  *time.Time `json:"editedAt,omitempty"`  // set when message was edited
 
 	// Reply fields — populated via LEFT JOIN in the repository; not stored as separate columns.
-	ReplyToID       *uuid.UUID `json:"replyToId,omitempty"`
-	ReplyToSeq      *int64     `json:"replyToSeq,omitempty"`
-	ReplyToText     string     `json:"replyToText,omitempty"`
-	ReplyToUserName string     `json:"replyToUserName,omitempty"`
+	ReplyToID        *uuid.UUID `json:"replyToId,omitempty"`
+	ReplyToSeq       *int64     `json:"replyToSeq,omitempty"`
+	ReplyToText      string     `json:"replyToText,omitempty"`
+	ReplyToUserName  string     `json:"replyToUserName,omitempty"`
+	ReplyToCreatedAt *time.Time `json:"replyToCreatedAt,omitempty"`
 }

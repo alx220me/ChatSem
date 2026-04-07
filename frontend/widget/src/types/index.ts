@@ -20,6 +20,7 @@ export interface Message {
   replyToSeq?: number
   replyToText?: string
   replyToUserName?: string
+  replyToCreatedAt?: string
 }
 
 export interface SendResponse {

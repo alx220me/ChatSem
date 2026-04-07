@@ -20,6 +20,30 @@ interface ModTarget {
   action: 'ban' | 'mute'
 }
 
+function formatMessageTime(isoString: string): string {
+  const date = new Date(isoString)
+  const now = new Date()
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+
+  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return time
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+
+  if (isYesterday) return `вчера, ${time}`
+
+  const dateStr = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  return `${dateStr}, ${time}`
+}
+
 function SkeletonRow(): React.ReactElement {
   return (
     <div
@@ -98,6 +122,8 @@ export function MessageList({
     setModReason('')
   }
 
+  const editSavingRef = React.useRef(false)
+
   async function handleEditSave(msgId: string) {
     const trimmed = editText.trim()
     if (!trimmed || !onEdit) {
@@ -107,8 +133,13 @@ export function MessageList({
     if (import.meta.env.DEV) {
       console.debug('[MessageList] edit save', msgId, trimmed)
     }
-    await onEdit(msgId, trimmed)
-    setEditingId(null)
+    editSavingRef.current = true
+    try {
+      await onEdit(msgId, trimmed)
+    } finally {
+      editSavingRef.current = false
+      setEditingId(null)
+    }
   }
 
   function scrollToSeq(seq: number) {
@@ -171,7 +202,7 @@ export function MessageList({
                 }}
               >
                 <span style={{ fontWeight: 600, color: '#333' }}>{msg.userName ?? msg.userId}</span>
-                <span>{new Date(msg.createdAt).toLocaleTimeString()}</span>
+                <span>{formatMessageTime(msg.createdAt)}</span>
               </div>
 
               {/* Reply quote block */}
@@ -192,9 +223,16 @@ export function MessageList({
                     overflow: 'hidden',
                   }}
                 >
-                  <span style={{ fontWeight: 600, color: '#2563eb', marginRight: 4 }}>
-                    {msg.replyToUserName || 'User'}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontWeight: 600, color: '#2563eb' }}>
+                      {msg.replyToUserName || 'User'}
+                    </span>
+                    {msg.replyToCreatedAt && (
+                      <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                        {formatMessageTime(msg.replyToCreatedAt)}
+                      </span>
+                    )}
+                  </div>
                   <span style={{ color: '#6b7280' }}>
                     {msg.replyToText
                       ? (msg.replyToText.length > 80 ? msg.replyToText.slice(0, 80) + '…' : msg.replyToText)
@@ -204,31 +242,37 @@ export function MessageList({
               )}
 
               {isEditing ? (
-                <textarea
-                  autoFocus
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      void handleEditSave(msg.id)
-                    }
-                    if (e.key === 'Escape') {
-                      setEditingId(null)
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    fontSize: 14,
-                    padding: '4px 6px',
-                    border: '1px solid #2563eb',
-                    borderRadius: 4,
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box',
-                    minHeight: 60,
-                  }}
-                />
+                <div>
+                  <textarea
+                    autoFocus
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onBlur={() => { if (!editSavingRef.current) setEditingId(null) }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        void handleEditSave(msg.id)
+                      }
+                      if (e.key === 'Escape') {
+                        setEditingId(null)
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      fontSize: 14,
+                      padding: '4px 6px',
+                      border: '1px solid #2563eb',
+                      borderRadius: 4,
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                      minHeight: 60,
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    Enter — сохранить · Esc — отмена
+                  </div>
+                </div>
               ) : (
                 <div
                   style={{

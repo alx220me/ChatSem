@@ -51,7 +51,7 @@ func (r *MessageRepo) GetByChatIDAfterSeq(ctx context.Context, chatID uuid.UUID,
 		"chat_id", chatID, "after_seq", afterSeq, "limit", limit)
 	rows, err := r.db.Query(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at, m.edited_at,
-		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, ''), rm.created_at
 		FROM messages m
 		LEFT JOIN users u  ON u.id  = m.user_id
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
@@ -80,7 +80,7 @@ func (r *MessageRepo) ListByChatID(ctx context.Context, chatID uuid.UUID, limit,
 		"chat_id", chatID, "limit", limit, "offset", offset)
 	rows, err := r.db.Query(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, COALESCE(u.name, ''), m.text, m.seq, m.created_at, m.deleted_at, m.edited_at,
-		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, ''), rm.created_at
 		FROM messages m
 		LEFT JOIN users u  ON u.id  = m.user_id
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
@@ -180,13 +180,13 @@ func (r *MessageRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Messag
 	m := &domain.Message{}
 	err := r.db.QueryRow(ctx, `
 		SELECT m.id, m.chat_id, m.user_id, m.text, m.seq, m.created_at, m.deleted_at, m.edited_at,
-		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, '')
+		       m.reply_to_id, rm.seq, COALESCE(LEFT(rm.text, 100), ''), COALESCE(ru.name, ''), rm.created_at
 		FROM messages m
 		LEFT JOIN messages rm ON rm.id = m.reply_to_id
 		LEFT JOIN users ru    ON ru.id = rm.user_id
 		WHERE m.id = $1`, id).Scan(
 		&m.ID, &m.ChatID, &m.UserID, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt, &m.EditedAt,
-		&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName,
+		&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName, &m.ReplyToCreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("MessageRepo.GetByID: %w", err)
@@ -208,7 +208,7 @@ func scanMessages(rows interface {
 		m := &domain.Message{}
 		if err := rows.Scan(
 			&m.ID, &m.ChatID, &m.UserID, &m.UserName, &m.Text, &m.Seq, &m.CreatedAt, &m.DeletedAt, &m.EditedAt,
-			&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName,
+			&m.ReplyToID, &m.ReplyToSeq, &m.ReplyToText, &m.ReplyToUserName, &m.ReplyToCreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
