@@ -91,8 +91,12 @@ export class ApiClient {
     return [res.parent, ...(res.children ?? [])]
   }
 
-  async joinRoom(eventId: string, roomId: string): Promise<void> {
-    await this.request<unknown>('POST', `/chat/join`, { event_id: eventId, room_id: roomId })
+  async joinRoom(eventId: string, roomId: string, roomName?: string): Promise<void> {
+    await this.request<unknown>('POST', `/chat/join`, {
+      event_id: eventId,
+      room_id: roomId,
+      ...(roomName ? { room_name: roomName } : {}),
+    })
   }
 
   async getMessages(

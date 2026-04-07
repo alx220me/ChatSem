@@ -4,6 +4,7 @@ export interface Chat {
   parentId: string | null
   type: 'parent' | 'child'
   externalRoomId: string | null
+  externalRoomName?: string
 }
 
 export interface Message {
@@ -85,6 +86,12 @@ export interface WidgetConfig {
    * Min: 240 × 280. Max: 900 × 900.
    */
   defaultSize?: { w: number; h: number }
+  /**
+   * Human-readable room name shown in the chat header.
+   * Takes precedence over the server-stored name; both override externalRoomId display.
+   * Example: "Main Stage" or "Workshop Hall A".
+   */
+  roomName?: string
   /**
    * Accent color for the widget UI (CSS color string, e.g. "#2563eb" or "rgb(37,99,235)").
    * Applied to the chat header background and the collapsed FAB button.

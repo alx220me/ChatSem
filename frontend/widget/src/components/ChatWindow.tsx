@@ -19,6 +19,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     api,
     config.eventId,
     config.roomId,
+    config.roomName,
   )
 
   const [pollError, setPollError] = useState<string | null>(null)
@@ -221,6 +222,17 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   )
 
   const accent = config.accentColor ?? '#2563eb'
+
+  // Room title priority: server-stored name > config.roomName > externalRoomId > 'Chat'
+  const roomTitle = chat?.externalRoomName
+    ?? config.roomName
+    ?? (chat?.externalRoomId ? `#${chat.externalRoomId}` : null)
+    ?? (chat ? 'Chat' : (loading ? '' : 'Chat'))
+
+  if (import.meta.env.DEV && chat) {
+    console.debug('[ChatWindow] room title resolved:', roomTitle,
+      'from server:', chat.externalRoomName, 'from config:', config.roomName)
+  }
   const accentText = config.accentTextColor ?? '#ffffff'
   // Derive a semi-transparent version of accentText for secondary labels and borders.
   const accentTextMuted = accentText === '#ffffff' || accentText === 'white'
@@ -409,9 +421,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
               whiteSpace: 'nowrap',
             }}
           >
-            {chat
-              ? (chat.externalRoomId ? `#${chat.externalRoomId}` : 'Chat')
-              : (loading ? '' : 'Chat')}
+            {roomTitle}
           </span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

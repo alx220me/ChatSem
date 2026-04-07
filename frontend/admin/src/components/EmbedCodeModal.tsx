@@ -18,9 +18,10 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
     eventId: '${eventId}',
     floating: true,
     defaultCollapsed: true,    // start as FAB icon; false = start expanded
+    // roomName: 'Main Stage',    // optional: room display name shown in the header
     // accentColor: '#2563eb',    // header and FAB button color (default: blue)
     // accentTextColor: '#ffffff', // text/icon color in header and FAB (default: white)
-    // roomId: 'my-room',      // optional: embed a specific room
+    // roomId: 'my-room',         // optional: embed a specific room
     tokenProvider: async function() {
       // Call YOUR backend — it holds the API secret and calls ChatSem auth:
       //   POST /api/auth/token  Authorization: Bearer <api_secret>
@@ -38,6 +39,7 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
   window.ChatSem.init({
     containerId: 'chat-widget',
     eventId: '${eventId}',
+    // roomName: 'Main Stage',    // optional: room display name shown in the header
     // accentColor: '#2563eb',    // header color (default: blue)
     // accentTextColor: '#ffffff', // text/icon color in header (default: white)
     // roomId: 'my-room',

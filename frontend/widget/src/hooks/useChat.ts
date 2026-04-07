@@ -15,6 +15,7 @@ export function useChat(
   api: ApiClient,
   eventId: string,
   roomId?: string,
+  roomName?: string,
 ): UseChatResult {
   const [chat, setChat] = useState<Chat | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -32,7 +33,7 @@ export function useChat(
 
         // If roomId given — join first so the child chat exists, then list
         if (roomId) {
-          await api.joinRoom(eventId, roomId)
+          await api.joinRoom(eventId, roomId, roomName)
           if (cancelled) return
         }
 
@@ -76,7 +77,7 @@ export function useChat(
     return () => {
       cancelled = true
     }
-  }, [api, eventId, roomId])
+  }, [api, eventId, roomId, roomName])
 
   const sendMessage = useCallback(
     async (text: string, replyToId?: string): Promise<SendResponse> => {
