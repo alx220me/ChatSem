@@ -10,16 +10,34 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
 
   const baseUrl = import.meta.env.VITE_WIDGET_BASE_URL ?? 'http://localhost:5173'
 
-  const snippet = `<div id="chat-widget" style="height:500px"></div>
+  const snippet = `<!-- Option A: floating widget (recommended) -->
+<!-- No placeholder div needed — widget creates its own container -->
+<script src="${baseUrl}/widget.js" defer></script>
+<script defer>
+  window.ChatSem.init({
+    eventId: '${eventId}',
+    floating: true,
+    defaultCollapsed: true,   // start as FAB icon; false = start expanded
+    // roomId: 'my-room',     // optional: embed a specific room
+    tokenProvider: async function() {
+      // Call YOUR backend — it holds the API secret and calls ChatSem auth:
+      //   POST /api/auth/token  Authorization: Bearer <api_secret>
+      const res = await fetch('/your-server/chat-token');
+      const data = await res.json();
+      return data.token;
+    },
+  });
+</script>
+
+<!-- Option B: embedded in your layout -->
+<div id="chat-widget" style="height:500px"></div>
 <script src="${baseUrl}/widget.js" defer></script>
 <script defer>
   window.ChatSem.init({
     containerId: 'chat-widget',
     eventId: '${eventId}',
-    // roomId: 'my-room',  // optional: embed a specific room
+    // roomId: 'my-room',
     tokenProvider: async function() {
-      // Call YOUR backend — it holds the API secret and calls ChatSem auth:
-      //   POST /api/auth/token  Authorization: Bearer <api_secret>
       const res = await fetch('/your-server/chat-token');
       const data = await res.json();
       return data.token;
@@ -87,7 +105,7 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
           backgroundColor: '#fff',
           borderRadius: 8,
           padding: 24,
-          maxWidth: 560,
+          maxWidth: 680,
           width: '100%',
           boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
         }}
@@ -95,15 +113,17 @@ export function EmbedCodeModal({ eventId, onClose }: EmbedCodeModalProps): React
       >
         <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>Widget Embed Code</h2>
         <p style={{ margin: '0 0 12px', fontSize: 14, color: '#6b7280' }}>
-          Paste this snippet into your page. Implement{' '}
+          Choose <strong>Option A</strong> (floating FAB, no placeholder div needed) or{' '}
+          <strong>Option B</strong> (embedded in your layout).
+          Implement{' '}
           <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>
             /your-server/chat-token
           </code>{' '}
-          on your backend — it should call the ChatSem auth API with your API secret and return{' '}
+          on your backend — it calls the ChatSem auth API with your API secret and returns{' '}
           <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>
             {'{'}token{'}'}
           </code>.
-          The widget calls <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>tokenProvider</code> on init and automatically on token expiry.
+          The widget refreshes the token automatically on expiry.
         </p>
         <pre
           style={{

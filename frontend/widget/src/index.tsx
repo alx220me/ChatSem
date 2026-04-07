@@ -13,10 +13,24 @@ declare global {
 
 window.ChatSem = {
   async init(config: WidgetConfig) {
-    const container = document.getElementById(config.containerId)
+    // In floating mode containerId is optional — use a stable default if omitted.
+    const containerId = config.containerId || 'chatsem-widget'
+    let container = document.getElementById(containerId)
+
     if (!container) {
-      console.error('[ChatSem] container not found:', config.containerId)
-      return
+      if (config.floating) {
+        // Floating mode: create the mount point automatically so the host page
+        // doesn't need a placeholder div.
+        container = document.createElement('div')
+        container.id = containerId
+        document.body.appendChild(container)
+        if (import.meta.env.DEV) {
+          console.debug('[ChatSem] created container for floating widget', containerId)
+        }
+      } else {
+        console.error('[ChatSem] container not found:', containerId)
+        return
+      }
     }
 
     // Resolve the initial token: tokenProvider takes priority over static token.
