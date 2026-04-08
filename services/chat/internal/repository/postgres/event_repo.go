@@ -36,6 +36,21 @@ func (r *EventRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Event, e
 	return e, nil
 }
 
+// GetByAllowedOrigin returns the event whose allowed_origin matches the given value.
+func (r *EventRepo) GetByAllowedOrigin(ctx context.Context, origin string) (*domain.Event, error) {
+	slog.Debug("[ChatEventRepo.GetByAllowedOrigin] query", "origin", origin)
+	row := r.db.QueryRow(ctx, `
+		SELECT id, name, settings, allowed_origin, api_secret, created_at
+		FROM events WHERE allowed_origin = $1 LIMIT 1`, origin)
+
+	e := &domain.Event{}
+	if err := row.Scan(&e.ID, &e.Name, &e.Settings, &e.AllowedOrigin, &e.APISecret, &e.CreatedAt); err != nil {
+		return nil, fmt.Errorf("ChatEventRepo.GetByAllowedOrigin: %w", err)
+	}
+	slog.Debug("[ChatEventRepo.GetByAllowedOrigin] found", "event_id", e.ID)
+	return e, nil
+}
+
 // Create inserts a new event and sets e.ID.
 func (r *EventRepo) Create(ctx context.Context, e *domain.Event) error {
 	slog.Debug("[ChatEventRepo.Create] inserting event", "name", e.Name)

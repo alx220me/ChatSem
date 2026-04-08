@@ -18,6 +18,7 @@ const claimsKey ctxKey = 0
 func Auth(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			slog.Debug("[AuthMiddleware] incoming", "method", r.Method, "path", r.URL.Path, "origin", r.Header.Get("Origin"))
 			header := r.Header.Get("Authorization")
 			if !strings.HasPrefix(header, "Bearer ") {
 				slog.Warn("[AuthMiddleware] missing or malformed Authorization header", "path", r.URL.Path)

@@ -11,6 +11,9 @@ import (
 // EventRepository is the minimal event store interface needed by the chat service.
 type EventRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Event, error)
+	// GetByAllowedOrigin returns the event whose allowed_origin matches origin.
+	// Used by CORS preflight handler (OPTIONS) which has no JWT claims.
+	GetByAllowedOrigin(ctx context.Context, origin string) (*domain.Event, error)
 }
 
 // ChatRepository is the minimal chat store interface needed by the chat service.

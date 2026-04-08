@@ -48,7 +48,7 @@ window.ChatSem = {
     // tokenProvider is used for both init and refresh; onTokenExpired is the legacy fallback.
     const refreshSource = config.tokenProvider ?? config.onTokenExpired
     const api = new ApiClient(
-      '/api',
+      (config.apiUrl ?? '') + '/api',
       () => instanceToken,
       refreshSource
         ? async () => {

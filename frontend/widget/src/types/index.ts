@@ -52,6 +52,13 @@ export interface WidgetConfig {
    */
   containerId?: string
   eventId: string
+  /**
+   * Base URL of the ChatSem service, e.g. "https://chat.example.com".
+   * Defaults to the current origin (empty string) — use this when the widget
+   * is served from the same domain as the chat backend.
+   * Required when the widget is embedded on a third-party site.
+   */
+  apiUrl?: string
   /** Static JWT token. Use either this or tokenProvider, not both. */
   token?: string
   /**
