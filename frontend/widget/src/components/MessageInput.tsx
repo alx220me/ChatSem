@@ -125,88 +125,103 @@ export function MessageInput({
           </button>
         </div>
       )}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          padding: '8px 12px',
-          alignItems: 'flex-end',
-        }}
-      >
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isDisabled}
-          placeholder="Введите сообщение..."
-          rows={1}
+      <div style={{ padding: '8px 12px' }}>
+        <div
           style={{
-            flex: 1,
-            resize: 'none',
+            display: 'flex',
+            alignItems: 'flex-end',
             border: '1px solid #d0d0d0',
             borderRadius: 8,
-            padding: '8px 10px',
-            fontSize: 14,
-            fontFamily: 'inherit',
-            lineHeight: 1.4,
-            outline: 'none',
-            maxHeight: 120,
-            overflowY: 'auto',
-            opacity: isDisabled ? 0.6 : 1,
-          }}
-        />
-        <div style={{ flexShrink: 0 }}>
-          <button
-            ref={emojiButtonRef}
-            onClick={toggleEmojiPicker}
-            onMouseDown={(e) => e.stopPropagation()}
-            disabled={isDisabled}
-            title="Смайлики"
-            style={{
-              padding: '8px 10px',
-              borderRadius: 8,
-              border: '1px solid #d0d0d0',
-              backgroundColor: emojiPickerOpen ? '#f0f0f0' : '#fff',
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              fontSize: 18,
-              height: 38,
-              opacity: isDisabled ? 0.6 : 1,
-              lineHeight: 1,
-            }}
-          >
-            😊
-          </button>
-          {emojiPickerOpen && emojiAnchorRect && (
-            <EmojiPicker onSelect={handleEmojiSelect} onClose={closeEmojiPicker} anchorRect={emojiAnchorRect} />
-          )}
-        </div>
-        <button
-          onClick={() => void handleSend()}
-          disabled={isDisabled || !text.trim()}
-          aria-label="Отправить"
-          title="Отправить"
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 8,
-            border: 'none',
-            backgroundColor: isDisabled || !text.trim() ? '#ccc' : '#2563eb',
-            color: '#fff',
-            cursor: isDisabled || !text.trim() ? 'not-allowed' : 'pointer',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            opacity: sending ? 0.7 : 1,
+            backgroundColor: isDisabled ? '#f9fafb' : '#fff',
+            opacity: isDisabled ? 0.7 : 1,
+            overflow: 'hidden',
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isDisabled}
+            placeholder="Введите сообщение..."
+            rows={1}
+            style={{
+              flex: 1,
+              resize: 'none',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              padding: '8px 10px',
+              fontSize: 14,
+              fontFamily: 'inherit',
+              lineHeight: 1.4,
+              maxHeight: 120,
+              overflowY: 'auto',
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'flex-end', flexShrink: 0, padding: '4px 4px' }}>
+            <button
+              ref={emojiButtonRef}
+              onClick={toggleEmojiPicker}
+              onMouseDown={(e) => e.stopPropagation()}
+              disabled={isDisabled}
+              title="Смайлики"
+              style={{
+                width: 30,
+                height: 30,
+                border: 'none',
+                background: 'none',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                fontSize: 17,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                borderRadius: 6,
+                opacity: isDisabled ? 0.5 : 1,
+                backgroundColor: emojiPickerOpen ? '#f0f0f0' : 'transparent',
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth="2" color={isDisabled ? '#d1d5db' : emojiPickerOpen ? '#374151' : '#9ca3af'}>
+                <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round"/>
+                <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/>
+                <circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
+            {emojiPickerOpen && emojiAnchorRect && (
+              <EmojiPicker onSelect={handleEmojiSelect} onClose={closeEmojiPicker} anchorRect={emojiAnchorRect} />
+            )}
+            <button
+              onClick={() => void handleSend()}
+              disabled={isDisabled || !text.trim()}
+              aria-label="Отправить"
+              title="Отправить"
+              style={{
+                width: 30,
+                height: 30,
+                border: 'none',
+                background: 'none',
+                color: isDisabled || !text.trim() ? '#d1d5db' : '#374151',
+                cursor: isDisabled || !text.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                borderRadius: 6,
+                opacity: sending ? 0.5 : 1,
+                transition: 'color 0.15s',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <g transform="rotate(45, 12, 12)">
+                  <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </g>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ApiClient } from '../api/client'
 
 const HEARTBEAT_INTERVAL = 30_000 // 30s
 const POLL_INTERVAL = 15_000      // 15s
 
-export function useOnline(api: ApiClient, chatId: string | null, enabled = true): number {
+export function useOnline(
+  api: ApiClient,
+  chatId: string | null,
+  enabled = true,
+  onSuccess?: () => void,
+): number {
+  const onSuccessRef = useRef(onSuccess)
+  onSuccessRef.current = onSuccess
+
   const [count, setCount] = useState(0)
 
   useEffect(() => {
@@ -15,6 +23,7 @@ export function useOnline(api: ApiClient, chatId: string | null, enabled = true)
     async function sendHeartbeat() {
       try {
         await api.heartbeat(chatId!)
+        onSuccessRef.current?.()
       } catch {
         // ignore — presence is best-effort
       }

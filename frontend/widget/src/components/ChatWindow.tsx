@@ -12,6 +12,15 @@ import { MessageInput } from './MessageInput'
 import { Toast } from './Toast'
 import type { ToastState } from './Toast'
 
+function ConnectingDots(): React.ReactElement {
+  const [frame, setFrame] = React.useState(0)
+  React.useEffect(() => {
+    const t = setInterval(() => setFrame((f) => (f + 1) % 3), 420)
+    return () => clearInterval(t)
+  }, [])
+  return <span style={{ display: 'inline-block', minWidth: 16, textAlign: 'left' }}>{'...'.slice(0, frame + 1)}</span>
+}
+
 interface ChatWindowProps {
   config: WidgetConfig
   api: ApiClient
@@ -135,13 +144,17 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     setPollError(msg)
   }, [])
 
+  const handleReconnect = useCallback(() => {
+    setPollError(null)
+  }, [])
+
   // Passed to useLongPoll — only active while not banned
   const activeChatId = initialized && !isBanned ? (chat?.id ?? null) : null
 
   // Start polling from the highest seq already loaded to avoid receiving stale messages out of order.
   const initialSeq = messages.reduce((max, m) => Math.max(max, m.seq), 0)
-  useLongPoll(api, activeChatId, initialSeq, handlePollMessages, handlePollError, handleBanned)
-  const onlineCount = useOnline(api, chat?.id ?? null, !isBanned)
+  useLongPoll(api, activeChatId, initialSeq, handlePollMessages, handlePollError, handleBanned, handleReconnect)
+  const onlineCount = useOnline(api, chat?.id ?? null, !isBanned, handleReconnect)
 
   const currentUserId = api.getCurrentUserId()
   const currentUserRole = api.getCurrentUserRole()
@@ -268,9 +281,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   const accentTextMuted = accentText === '#ffffff' || accentText === 'white'
     ? 'rgba(255,255,255,0.85)'
     : 'rgba(0,0,0,0.55)'
-  const accentTextSubtle = accentText === '#ffffff' || accentText === 'white'
-    ? 'rgba(255,255,255,0.4)'
-    : 'rgba(0,0,0,0.2)'
+
   const accentBorder = accentText === '#ffffff' || accentText === 'white'
     ? 'rgba(255,255,255,0.35)'
     : 'rgba(0,0,0,0.2)'
@@ -320,16 +331,12 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           Чат
         </span>
 
-        {/* Online indicator */}
         {onlineCount > 0 && (
-          <span style={{
-            display: 'flex', alignItems: 'center', gap: 3,
-            color: accentTextMuted, fontSize: 11, whiteSpace: 'nowrap',
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%',
-              backgroundColor: '#4ade80', flexShrink: 0,
-            }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: accentTextMuted, fontSize: 11, whiteSpace: 'nowrap' }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+            </svg>
             {onlineCount > 99 ? '99+' : onlineCount}
           </span>
         )}
@@ -340,21 +347,6 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
   // ─── Shared inner content (used in both floating-expanded and embedded) ──
   const innerContent = (
     <>
-      {pollError && (
-        <div
-          style={{
-            backgroundColor: '#fef2f2',
-            color: '#b91c1c',
-            fontSize: 13,
-            padding: '6px 12px',
-            textAlign: 'center',
-            borderBottom: '1px solid #fecaca',
-          }}
-        >
-          Connection error, retrying...
-        </div>
-      )}
-
       {(isBanned || (error && error !== 'banned' && !loading)) && (
         <div
           style={{
@@ -400,6 +392,23 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             loadingMore={loadingMore}
             scrollToBottomTrigger={scrollToBottomTrigger}
           />
+          {pollError && (
+            <div
+              style={{
+                backgroundColor: '#fef2f2',
+                color: '#b91c1c',
+                fontSize: 12,
+                padding: '5px 12px',
+                textAlign: 'center',
+                borderTop: '1px solid #fecaca',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              Нет соединения, переподключение<ConnectingDots />
+            </div>
+          )}
           <MessageInput
             onSend={handleSend}
             disabled={loading || !chat}
@@ -446,6 +455,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: 16,
             padding: '10px 14px',
             borderBottom: '1px solid rgba(0,0,0,0.1)',
             backgroundColor: accent,
@@ -469,25 +479,12 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {chat && (
-              <span
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  fontSize: 12,
-                  color: accentTextMuted,
-                }}
-              >
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    backgroundColor: onlineCount > 0 ? '#4ade80' : accentTextSubtle,
-                    display: 'inline-block',
-                  }}
-                />
-                {onlineCount} online
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: accentTextMuted }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+                {onlineCount}
               </span>
             )}
 
@@ -592,6 +589,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 16,
           padding: '10px 14px',
           borderBottom: '1px solid rgba(0,0,0,0.1)',
           backgroundColor: accent,
@@ -613,26 +611,12 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             : (loading ? '' : 'Chat')}
         </span>
         {chat && (
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              color: accentTextMuted,
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: onlineCount > 0 ? '#4ade80' : accentTextSubtle,
-                display: 'inline-block',
-              }}
-            />
-            {onlineCount} online
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: accentTextMuted, flexShrink: 0 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            {onlineCount}
           </span>
         )}
       </div>

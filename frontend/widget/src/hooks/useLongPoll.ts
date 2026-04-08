@@ -10,6 +10,7 @@ export function useLongPoll(
   onMessages: (msgs: Message[], deletedIds: string[], editedMessages: EditedMessage[]) => void,
   onError?: (err: unknown) => void,
   onBanned?: () => void,
+  onReconnect?: () => void,
 ): void {
   const onMessagesRef = useRef(onMessages)
   onMessagesRef.current = onMessages
@@ -17,6 +18,8 @@ export function useLongPoll(
   onErrorRef.current = onError
   const onBannedRef = useRef(onBanned)
   onBannedRef.current = onBanned
+  const onReconnectRef = useRef(onReconnect)
+  onReconnectRef.current = onReconnect
   // Sync on every render so the effect captures the right value when chatId first becomes non-null.
   const initialSeqRef = useRef(initialSeq)
   initialSeqRef.current = initialSeq
@@ -45,8 +48,9 @@ export function useLongPoll(
           const deletedIds = response.deleted_ids ?? []
           const editedMessages = response.edited_messages ?? []
 
-          // Successful response — reset backoff
+          // Successful response — reset backoff, notify caller to clear any error UI
           retryDelay = 1_000
+          onReconnectRef.current?.()
 
           // Advance delete cursor
           if (response.last_delete_seq != null && response.last_delete_seq > lastKnownDeleteSeq) {
