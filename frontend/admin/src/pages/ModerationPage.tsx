@@ -115,6 +115,7 @@ function BansTab({ eventId }: { eventId: string }): React.ReactElement {
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>
                 <th style={thStyle}>User ID</th>
                 <th style={thStyle}>Reason</th>
+                <th style={thStyle}>Banned At</th>
                 <th style={thStyle}>Expires</th>
                 <th style={thStyle}></th>
               </tr>
@@ -124,7 +125,10 @@ function BansTab({ eventId }: { eventId: string }): React.ReactElement {
                 <tr key={ban.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={tdStyle}>{ban.userId}</td>
                   <td style={tdStyle}>{ban.reason}</td>
-                  <td style={tdStyle}>{ban.expiresAt ? new Date(ban.expiresAt).toLocaleDateString() : '—'}</td>
+                  <td style={tdStyle}>{formatDateTime(ban.createdAt)}</td>
+                  <td style={{ ...tdStyle, color: ban.expiresAt ? '#4b5563' : '#6b7280', fontStyle: ban.expiresAt ? 'normal' : 'italic' }}>
+                    {formatDateTime(ban.expiresAt)}
+                  </td>
                   <td style={tdStyle}>
                     <button onClick={() => setConfirmBanId(ban.id)} style={btnSmallDangerStyle}>
                       Unban
@@ -134,7 +138,7 @@ function BansTab({ eventId }: { eventId: string }): React.ReactElement {
               ))}
               {bans.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 24 }}>
+                  <td colSpan={5} style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 24 }}>
                     No active bans
                   </td>
                 </tr>
@@ -294,6 +298,7 @@ function MutesTab({ eventId }: { eventId: string }): React.ReactElement {
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>
                 <th style={thStyle}>User ID</th>
                 <th style={thStyle}>Reason</th>
+                <th style={thStyle}>Muted At</th>
                 <th style={thStyle}>Expires</th>
                 <th style={thStyle}></th>
               </tr>
@@ -303,7 +308,10 @@ function MutesTab({ eventId }: { eventId: string }): React.ReactElement {
                 <tr key={mute.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={tdStyle}>{mute.userId}</td>
                   <td style={tdStyle}>{mute.reason}</td>
-                  <td style={tdStyle}>{mute.expiresAt ? new Date(mute.expiresAt).toLocaleDateString() : '—'}</td>
+                  <td style={tdStyle}>{formatDateTime(mute.createdAt)}</td>
+                  <td style={{ ...tdStyle, color: mute.expiresAt ? '#4b5563' : '#6b7280', fontStyle: mute.expiresAt ? 'normal' : 'italic' }}>
+                    {formatDateTime(mute.expiresAt)}
+                  </td>
                   <td style={tdStyle}>
                     <button onClick={() => setConfirmMuteId(mute.id)} style={btnSmallDangerStyle}>
                       Unmute
@@ -313,7 +321,7 @@ function MutesTab({ eventId }: { eventId: string }): React.ReactElement {
               ))}
               {mutes.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 24 }}>
+                  <td colSpan={5} style={{ ...tdStyle, color: '#9ca3af', textAlign: 'center', padding: 24 }}>
                     No active mutes
                   </td>
                 </tr>
@@ -373,6 +381,11 @@ export function ModerationPage(): React.ReactElement {
       {tab === 'bans' ? <BansTab eventId={eventId} /> : <MutesTab eventId={eventId} />}
     </div>
   )
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return 'Permanent'
+  return new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }

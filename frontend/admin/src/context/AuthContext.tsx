@@ -31,9 +31,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const [state, setState] = useState<AuthState>(loadSession)
 
   const getToken = useCallback(() => state.token ?? '', [state.token])
+
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(SESSION_NAME_KEY)
+    setState({ token: null, userName: null })
+  }, [])
+
   const api = useMemo(
-    () => (state.token ? new AdminApiClient('', getToken) : null),
-    [state.token, getToken],
+    () => (state.token ? new AdminApiClient('', getToken, logout) : null),
+    [state.token, getToken, logout],
   )
 
   const login = useCallback(async (username: string, password: string) => {
@@ -58,12 +65,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     setState({ token: data.token, userName: username })
 
     console.info('[AuthContext] logged in', username)
-  }, [])
-
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(SESSION_KEY)
-    sessionStorage.removeItem(SESSION_NAME_KEY)
-    setState({ token: null, userName: null })
   }, [])
 
   return (

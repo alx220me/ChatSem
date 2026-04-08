@@ -8,10 +8,12 @@ export interface CreateEventResponse extends Event {
 export class AdminApiClient {
   private baseUrl: string
   private getToken: () => string
+  private onUnauthorized?: () => void
 
-  constructor(baseUrl: string, getToken: () => string) {
+  constructor(baseUrl: string, getToken: () => string, onUnauthorized?: () => void) {
     this.baseUrl = baseUrl
     this.getToken = getToken
+    this.onUnauthorized = onUnauthorized
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -31,7 +33,10 @@ export class AdminApiClient {
 
     if (!res.ok) {
       if (res.status === 401) {
-        console.warn('[AdminClient] auth error', res.status)
+        console.warn('[AdminClient] session expired, redirecting to login')
+        this.onUnauthorized?.()
+        // Throw a non-descriptive error — the redirect will take over
+        throw new Error('Session expired')
       }
       const text = await res.text().catch(() => '')
       throw new Error(`${method} ${url} → ${res.status}: ${text}`)
