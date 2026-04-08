@@ -57,7 +57,7 @@
             // Call YOUR backend — it holds the API secret and calls ChatSem auth:
             //   POST /api/auth/token  Authorization: Bearer <api_secret>
             // In prod, widget.js is served from /widget/widget.js
-            const res = await fetch('/chat-token');
+            const res = await fetch('/chat-token?name=DIm&user_id=user_dim220');
             const data = await res.json();
             return data.token;
         },

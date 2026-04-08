@@ -32,22 +32,16 @@ export function useChat(
         setLoading(true)
         setError(null)
 
-        // If roomId given — join first so the child chat exists, then list
-        if (roomId) {
-          await api.joinRoom(eventId, roomId, roomName)
-          if (cancelled) return
-        }
-
-        const chats = await api.listChats(eventId)
-
-        if (cancelled) return
-
-        // Select the chat matching the roomId, or fall back to the parent chat
         let selected: Chat | undefined
+
         if (roomId) {
-          selected = chats.find((c) => c.externalRoomId === roomId)
-        }
-        if (!selected) {
+          // joinRoom creates/returns the child chat directly — no need to listChats
+          selected = await api.joinRoom(eventId, roomId, roomName)
+          if (cancelled) return
+        } else {
+          // No roomId — list chats and pick the parent
+          const chats = await api.listChats(eventId)
+          if (cancelled) return
           selected = chats.find((c) => c.type === 'parent') ?? chats[0]
         }
 

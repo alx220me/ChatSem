@@ -97,31 +97,6 @@ func CORS(eventRepo ports.EventRepository) func(http.Handler) http.Handler {
 	}
 }
 
-// CORSPreflight handles OPTIONS preflight requests that arrive without JWT claims.
-// It looks up the event by the request Origin header and responds with CORS headers.
-// Results are cached in-memory for 60 s.
-func CORSPreflight(eventRepo ports.EventRepository) http.HandlerFunc {
-	cache := newCORSCache()
-	return func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		allowed := resolveAllowedOrigin(r, eventRepo, cache, origin)
-		if allowed == "" || origin != allowed {
-			slog.Warn("[CORSPreflight] origin not found", "origin", origin)
-			http.Error(w, "origin not allowed", http.StatusForbidden)
-			return
-		}
-
-		slog.Debug("[CORSPreflight] preflight allowed", "origin", origin)
-		setCORSHeaders(w, allowed)
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
 // resolveAllowedOrigin returns the allowed origin string for the request.
 // Uses JWT claims when available, otherwise falls back to reverse-lookup by origin.
 func resolveAllowedOrigin(r *http.Request, repo ports.EventRepository, cache *corsCache, origin string) string {
@@ -156,5 +131,6 @@ func setCORSHeaders(w http.ResponseWriter, origin string) {
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, PATCH, OPTIONS")
+	w.Header().Set("Access-Control-Max-Age", "7200") // 2h — Chrome max; browser caches preflight
 	w.Header().Set("Vary", "Origin")
 }

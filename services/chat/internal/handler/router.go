@@ -41,15 +41,11 @@ func NewRouter(
 	msgH := NewMessageHandler(msgSvc)
 	pollH := NewPollHandler(broker, msgRepo, rdb)
 
-	// CORS preflight — OPTIONS has no JWT, so handled outside the auth group via origin lookup.
-	r.Options("/*", middleware.CORSPreflight(eventRepo))
-
 	// Public endpoint — no auth required.
 	r.Get("/api/chat/events/{eventID}/chats", chatH.ListChats)
 	// Authenticated endpoints.
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(jwtSecret))
-		r.Use(middleware.CORS(eventRepo))
 		r.Use(middleware.BanCheck(rdb, banRepo))
 
 		// Chat endpoints
