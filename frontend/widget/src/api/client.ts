@@ -184,8 +184,9 @@ export class ApiClient {
     await this.request<unknown>('POST', `/admin/mutes`, { user_id: userId, chat_id: chatId, reason })
   }
 
-  async heartbeat(chatId: string): Promise<void> {
-    await this.request<unknown>('POST', `/chat/${chatId}/heartbeat`)
+  async heartbeat(chatId: string): Promise<number> {
+    const res = await this.request<{ count: number }>('POST', `/chat/${chatId}/heartbeat`)
+    return res.count ?? 0
   }
 
   async leave(chatId: string): Promise<void> {

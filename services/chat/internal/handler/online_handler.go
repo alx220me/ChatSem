@@ -49,16 +49,19 @@ func (h *OnlineHandler) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	now := float64(time.Now().Unix())
 	key := onlineKey(chatID)
 
+	minScore := fmt.Sprintf("%d", time.Now().Add(-onlineTTL).Unix())
 	pipe := h.rdb.Pipeline()
 	pipe.ZAdd(r.Context(), key, redis.Z{Score: now, Member: claims.UserID.String()})
-	pipe.ZRemRangeByScore(r.Context(), key, "-inf", fmt.Sprintf("%d", time.Now().Add(-onlineTTL).Unix()))
+	pipe.ZRemRangeByScore(r.Context(), key, "-inf", minScore)
 	pipe.Expire(r.Context(), key, onlineTTL+10*time.Second)
+	zCountCmd := pipe.ZCount(r.Context(), key, minScore, "+inf")
 	if _, err := pipe.Exec(r.Context()); err != nil {
 		slog.Warn("[OnlineHandler.Heartbeat] redis error", "err", err)
 	}
 
-	slog.Debug("[OnlineHandler.Heartbeat] registered", "chat_id", chatID, "user_id", claims.UserID)
-	w.WriteHeader(http.StatusNoContent)
+	count := zCountCmd.Val()
+	slog.Debug("[OnlineHandler.Heartbeat] registered", "chat_id", chatID, "user_id", claims.UserID, "online", count)
+	response.JSON(w, http.StatusOK, map[string]int64{"count": count})
 }
 
 // Leave handles DELETE /api/chat/{chatID}/heartbeat.

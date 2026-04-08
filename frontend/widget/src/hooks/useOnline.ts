@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import type { ApiClient } from '../api/client'
 
 const HEARTBEAT_INTERVAL = 30_000 // 30s
-const POLL_INTERVAL = 15_000      // 15s
 
 export function useOnline(
   api: ApiClient,
@@ -22,31 +21,17 @@ export function useOnline(
 
     async function sendHeartbeat() {
       try {
-        await api.heartbeat(chatId!)
+        const n = await api.heartbeat(chatId!)
+        if (!destroyed) setCount(n)
         onSuccessRef.current?.()
       } catch {
         // ignore — presence is best-effort
       }
     }
 
-    async function fetchCount() {
-      try {
-        const n = await api.getOnlineCount(chatId!)
-        if (!destroyed) setCount(n)
-      } catch {
-        // ignore
-      }
-    }
-
-    // Heartbeat first so the user is counted before we fetch the number
-    async function init() {
-      await sendHeartbeat()
-      await fetchCount()
-    }
-    void init()
+    void sendHeartbeat()
 
     const heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
-    const pollTimer = setInterval(fetchCount, POLL_INTERVAL)
 
     // keepalive fetch — survives page close / tab switch
     function onBeforeUnload() {
@@ -57,7 +42,6 @@ export function useOnline(
     return () => {
       destroyed = true
       clearInterval(heartbeatTimer)
-      clearInterval(pollTimer)
       window.removeEventListener('beforeunload', onBeforeUnload)
       // Normal unmount (widget destroyed, SPA navigation, etc.)
       api.leave(chatId!).catch(() => {})
