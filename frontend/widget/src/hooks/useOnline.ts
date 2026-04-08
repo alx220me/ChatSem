@@ -4,11 +4,11 @@ import type { ApiClient } from '../api/client'
 const HEARTBEAT_INTERVAL = 30_000 // 30s
 const POLL_INTERVAL = 15_000      // 15s
 
-export function useOnline(api: ApiClient, chatId: string | null): number {
+export function useOnline(api: ApiClient, chatId: string | null, enabled = true): number {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    if (!chatId) return
+    if (!chatId || !enabled) return
 
     let destroyed = false
 
@@ -53,7 +53,7 @@ export function useOnline(api: ApiClient, chatId: string | null): number {
       // Normal unmount (widget destroyed, SPA navigation, etc.)
       api.leave(chatId!).catch(() => {})
     }
-  }, [api, chatId])
+  }, [api, chatId, enabled])
 
   return count
 }

@@ -9,11 +9,14 @@ export function useLongPoll(
   initialSeq: number,
   onMessages: (msgs: Message[], deletedIds: string[], editedMessages: EditedMessage[]) => void,
   onError?: (err: unknown) => void,
+  onBanned?: () => void,
 ): void {
   const onMessagesRef = useRef(onMessages)
   onMessagesRef.current = onMessages
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
+  const onBannedRef = useRef(onBanned)
+  onBannedRef.current = onBanned
   // Sync on every render so the effect captures the right value when chatId first becomes non-null.
   const initialSeqRef = useRef(initialSeq)
   initialSeqRef.current = initialSeq
@@ -87,6 +90,15 @@ export function useLongPoll(
             if (import.meta.env.DEV) {
               console.warn('[useLongPoll] session expired, stopping poll loop')
             }
+            break
+          }
+
+          // 403 banned — stop polling, notify caller
+          if (err instanceof HttpError && err.status === 403 && err.code === 'banned') {
+            if (import.meta.env.DEV) {
+              console.warn('[useLongPoll] user is banned, stopping poll loop')
+            }
+            onBannedRef.current?.()
             break
           }
 

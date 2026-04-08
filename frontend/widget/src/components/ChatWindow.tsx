@@ -25,6 +25,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     config.roomName,
   )
 
+  const [isBanned, setIsBanned] = useState(false)
   const [pollError, setPollError] = useState<string | null>(null)
   const [allMessages, setAllMessages] = useState<Message[]>([])
   const [initialized, setInitialized] = useState(false)
@@ -57,6 +58,16 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     if (import.meta.env.DEV) {
       console.debug('[ChatWindow] floating collapsed')
     }
+  }, [])
+
+  // Sync banned state from useChat's initial load error
+  React.useEffect(() => {
+    if (error === 'banned') setIsBanned(true)
+  }, [error])
+
+  const handleBanned = useCallback(() => {
+    setIsBanned(true)
+    setToast({ message: 'Вы заблокированы в этом мероприятии', variant: 'error' })
   }, [])
 
   // Merge initial messages from useChat into allMessages once loaded
@@ -124,10 +135,13 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
     setPollError(msg)
   }, [])
 
+  // Passed to useLongPoll — only active while not banned
+  const activeChatId = initialized && !isBanned ? (chat?.id ?? null) : null
+
   // Start polling from the highest seq already loaded to avoid receiving stale messages out of order.
   const initialSeq = messages.reduce((max, m) => Math.max(max, m.seq), 0)
-  useLongPoll(api, initialized ? (chat?.id ?? null) : null, initialSeq, handlePollMessages, handlePollError)
-  const onlineCount = useOnline(api, chat?.id ?? null)
+  useLongPoll(api, activeChatId, initialSeq, handlePollMessages, handlePollError, handleBanned)
+  const onlineCount = useOnline(api, chat?.id ?? null, !isBanned)
 
   const currentUserId = api.getCurrentUserId()
   const currentUserRole = api.getCurrentUserRole()
@@ -225,6 +239,10 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         setAllMessages((prev) => prev.filter((m) => m.id !== optimisticId))
         if (err instanceof HttpError && err.code === 'muted') {
           setToast({ message: 'Вы замьючены в этом чате', variant: 'error' })
+          return
+        }
+        if (err instanceof HttpError && (err.status === 403 || err.code === 'banned')) {
+          handleBanned()
           return
         }
         throw err
@@ -337,7 +355,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         </div>
       )}
 
-      {error && !loading && (
+      {(isBanned || (error && error !== 'banned' && !loading)) && (
         <div
           style={{
             flex: 1,
@@ -350,7 +368,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
             textAlign: 'center',
           }}
         >
-          {error === 'banned' ? (
+          {isBanned ? (
             <>
               <span style={{ fontSize: 32 }}>🚫</span>
               <span style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>
@@ -366,7 +384,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         </div>
       )}
 
-      {!error && (
+      {!isBanned && !error && (
         <>
           <MessageList
             messages={initialized ? allMessages : messages}
