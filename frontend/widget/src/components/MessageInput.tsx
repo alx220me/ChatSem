@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { Message } from '../types'
 import { EmojiPicker } from './EmojiPicker'
 
@@ -21,6 +21,12 @@ export function MessageInput({
   const [emojiAnchorRect, setEmojiAnchorRect] = useState<DOMRect | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (replyingTo) {
+      textareaRef.current?.focus()
+    }
+  }, [replyingTo])
 
   async function handleSend() {
     const trimmed = text.trim()

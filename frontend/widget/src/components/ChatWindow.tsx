@@ -232,6 +232,7 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         replyToSeq: replyingTo?.seq,
         replyToText: replyingTo?.text,
         replyToUserName: replyingTo?.userName,
+        replyToCreatedAt: replyingTo?.createdAt,
       }
       setAllMessages((prev) => [...prev, optimistic])
       setScrollToBottomTrigger((n) => n + 1)
