@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <script src="http://localhost/widget/widget.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f0f0f0; padding: 20px; }
+        h2 { font-size: 0.9rem; color: #555; margin-bottom: 8px; }
+        .users { display: flex; gap: 20px; }
+        .user-col { flex: 1; }
+        .connect-form { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .connect-form label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 3px; margin-top: 8px; }
+        .connect-form label:first-of-type { margin-top: 0; }
+        .connect-form input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; }
+        .connect-form button { margin-top: 10px; width: 100%; padding: 7px; background: #4f46e5; color: #fff;
+            border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        .connect-form button:hover { background: #4338ca; }
+        .chat-box { height: 500px; }
+        .status { font-size: 0.75rem; margin-top: 6px; padding: 5px 8px; border-radius: 4px; display: none; }
+        .status.ok  { background: #dcfce7; color: #166534; display: block; }
+        .status.err { background: #fee2e2; color: #991b1b; display: block; }
+    </style>
+</head>
+<body>
+<!--<div id="chat-widget" style="height:500px"></div>-->
+<!--<script src="http://localhost:5173/widget.js" defer></script>-->
+<!--<script defer>-->
+<!--    window.ChatSem.init({-->
+<!--        containerId: 'chat-widget',-->
+<!--        eventId: '2e77dd95-786d-4c03-92c0-a2ce794f7bac',-->
+<!--        // roomId: 'my-room',  // optional: embed a specific room-->
+<!--        tokenProvider: async function() {-->
+<!--            // Call YOUR backend — it holds the API secret and calls ChatSem auth:-->
+<!--            //   POST /api/auth/token  Authorization: Bearer <api_secret>-->
+<!--            const res = await fetch('/your-server/chat-token');-->
+<!--            const data = await res.json();-->
+<!--            return data.token;-->
+<!--        },-->
+<!--    });-->
+<!--</script>-->
+
+<!-- prod: src="/widget/widget.js" -->
+
+<script defer>
+    window.ChatSem.init({
+        //containerId: 'chat-widget',
+        apiUrl: 'http://localhost',  // ChatSem service URL; omit when widget and service share the same origin
+        eventId: '2e77dd95-786d-4c03-92c0-a2ce794f7bac',
+        floating: true,
+        accentColor: '#ffd501',
+        accentTextColor: '#212529',
+        defaultCollapsed: false,   // start as FAB icon; false = start expanded
+        roomId: 'my-room',    // optional: embed a specific room
+        roomName: 'Вечернее совещание и обсуждение дел насущны с выпиванием медовухи и поеданием пирогов',
+        tokenProvider: async function() {
+            // Call YOUR backend — it holds the API secret and calls ChatSem auth:
+            //   POST /api/auth/token  Authorization: Bearer <api_secret>
+            // In prod, widget.js is served from /widget/widget.js
+            const res = await fetch('/chat-token');
+            const data = await res.json();
+            return data.token;
+        },
+    });
+</script>
+
+</div>
+
+
+
+</body>
+</html>
