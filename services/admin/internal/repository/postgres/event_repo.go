@@ -51,6 +51,21 @@ func (r *EventRepo) Create(ctx context.Context, e *domain.Event) error {
 	return nil
 }
 
+// UpdateAPISecret replaces the bcrypt-hashed api_secret for the given event.
+// Returns an error if the event does not exist.
+func (r *EventRepo) UpdateAPISecret(ctx context.Context, id uuid.UUID, hashedSecret string) error {
+	slog.Debug("[AdminEventRepo.UpdateAPISecret] updating secret", "event_id", id)
+	tag, err := r.db.Exec(ctx, `UPDATE events SET api_secret = $1 WHERE id = $2`, hashedSecret, id)
+	if err != nil {
+		return fmt.Errorf("AdminEventRepo.UpdateAPISecret: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("AdminEventRepo.UpdateAPISecret: event not found: %s", id)
+	}
+	slog.Debug("[AdminEventRepo.UpdateAPISecret] updated", "event_id", id)
+	return nil
+}
+
 // List returns all events ordered by creation time.
 func (r *EventRepo) List(ctx context.Context) ([]*domain.Event, error) {
 	slog.Debug("[AdminEventRepo.List] query")

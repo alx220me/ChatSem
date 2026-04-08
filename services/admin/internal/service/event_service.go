@@ -114,6 +114,32 @@ func (s *EventService) ListEvents(ctx context.Context) ([]*domain.Event, error) 
 	return events, nil
 }
 
+// RotateAPISecret generates a new API secret for the given event, stores the bcrypt hash
+// in the database, and returns the plaintext secret (shown only once).
+func (s *EventService) RotateAPISecret(ctx context.Context, id uuid.UUID) (string, error) {
+	slog.Debug("[EventService.RotateAPISecret] start", "event_id", id)
+
+	plainSecret, err := generateSecret()
+	if err != nil {
+		slog.Error("[EventService.RotateAPISecret] generate secret failed", "event_id", id, "err", err)
+		return "", fmt.Errorf("EventService.RotateAPISecret generate: %w", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(plainSecret), bcrypt.DefaultCost)
+	if err != nil {
+		slog.Error("[EventService.RotateAPISecret] bcrypt failed", "event_id", id, "err", err)
+		return "", fmt.Errorf("EventService.RotateAPISecret bcrypt: %w", err)
+	}
+
+	if err := s.events.UpdateAPISecret(ctx, id, string(hash)); err != nil {
+		slog.Error("[EventService.RotateAPISecret] update failed", "event_id", id, "err", err)
+		return "", fmt.Errorf("EventService.RotateAPISecret update: %w", err)
+	}
+
+	slog.Info("[EventService.RotateAPISecret] rotated", "event_id", id)
+	return plainSecret, nil
+}
+
 // GetEvent returns an event by ID.
 func (s *EventService) GetEvent(ctx context.Context, id uuid.UUID) (*domain.Event, error) {
 	slog.Debug("[EventService.GetEvent] start", "event_id", id)

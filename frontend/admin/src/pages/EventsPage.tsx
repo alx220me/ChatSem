@@ -159,6 +159,143 @@ function CreateEventModal({ onClose, onCreated }: CreateEventModalProps): React.
   )
 }
 
+interface RotateSecretModalProps {
+  event: Event
+  onClose: () => void
+}
+
+function RotateSecretModal({ event, onClose }: RotateSecretModalProps): React.ReactElement {
+  const { api } = useAuth()
+  const [newSecret, setNewSecret] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  async function handleConfirm() {
+    if (!api) return
+    setLoading(true)
+    setError(null)
+    try {
+      if (import.meta.env.DEV) {
+        console.debug('[EventsPage] rotateAPISecret', event.id)
+      }
+      const res = await api.rotateAPISecret(event.id)
+      console.info('[EventsPage] secret rotated', event.id)
+      setNewSecret(res.api_secret)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rotate secret')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function copySecret() {
+    if (!newSecret) return
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(newSecret).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }).catch(() => fallbackCopy(newSecret))
+    } else {
+      fallbackCopy(newSecret)
+    }
+  }
+
+  function fallbackCopy(text: string) {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    try {
+      document.execCommand('copy')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } finally {
+      document.body.removeChild(ta)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: 8,
+          padding: 24,
+          maxWidth: 440,
+          width: '100%',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Rotate API Secret</h2>
+
+        {newSecret ? (
+          <div>
+            <p style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
+              New API secret for <strong>{event.name}</strong>. Save it — it will only be shown once:
+            </p>
+            <div
+              style={{
+                background: '#f3f4f6',
+                padding: 12,
+                borderRadius: 4,
+                fontFamily: 'monospace',
+                fontSize: 13,
+                wordBreak: 'break-all',
+                marginBottom: 16,
+              }}
+            >
+              {newSecret}
+            </div>
+            <button onClick={copySecret} style={btnSecondaryStyle}>
+              {copied ? 'Copied!' : 'Copy to clipboard'}
+            </button>
+            <button onClick={onClose} style={{ ...btnPrimaryStyle, marginLeft: 8 }}>
+              Done
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ fontSize: 14, color: '#374151', marginBottom: 16 }}>
+              Generate a new API secret for <strong>{event.name}</strong>?
+              The old secret will stop working immediately.
+            </p>
+            {error && (
+              <div style={{ color: '#b91c1c', fontSize: 13, marginBottom: 12 }}>{error}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={onClose} style={btnSecondaryStyle}>
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleConfirm()}
+                disabled={loading}
+                style={{ ...btnPrimaryStyle, backgroundColor: '#dc2626' }}
+              >
+                {loading ? 'Rotating...' : 'Rotate Secret'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function EventsPage(): React.ReactElement {
   const { api } = useAuth()
   const navigate = useNavigate()
@@ -167,6 +304,7 @@ export function EventsPage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [embedEventId, setEmbedEventId] = useState<string | null>(null)
+  const [rotateTarget, setRotateTarget] = useState<Event | null>(null)
 
   const load = useCallback(async () => {
     if (!api) return
@@ -212,7 +350,7 @@ export function EventsPage(): React.ReactElement {
               <th style={thStyle}>ID</th>
               <th style={thStyle}>Allowed Origin</th>
               <th style={thStyle}>Created At</th>
-              <th style={thStyle}>Code</th>
+              <th style={thStyle}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -236,12 +374,18 @@ export function EventsPage(): React.ReactElement {
                 </td>
                 <td style={tdStyle}>{ev.allowedOrigin}</td>
                 <td style={tdStyle}>{new Date(ev.createdAt).toLocaleString()}</td>
-                <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
+                <td style={{ ...tdStyle, display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => setEmbedEventId(ev.id)}
                     style={btnSecondaryStyle}
                   >
                     Code
+                  </button>
+                  <button
+                    onClick={() => setRotateTarget(ev)}
+                    style={{ ...btnSecondaryStyle, color: '#dc2626', borderColor: '#fca5a5' }}
+                  >
+                    Rotate Secret
                   </button>
                 </td>
               </tr>
@@ -263,6 +407,10 @@ export function EventsPage(): React.ReactElement {
 
       {embedEventId && (
         <EmbedCodeModal eventId={embedEventId} onClose={() => setEmbedEventId(null)} />
+      )}
+
+      {rotateTarget && (
+        <RotateSecretModal event={rotateTarget} onClose={() => setRotateTarget(null)} />
       )}
     </div>
   )

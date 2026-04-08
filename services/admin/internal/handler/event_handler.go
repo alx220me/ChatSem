@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"chatsem/services/admin/internal/service"
@@ -81,6 +82,38 @@ func (h *EventHandler) ListEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusOK, events)
+}
+
+// RotateSecret handles POST /api/admin/events/{eventID}/rotate-secret.
+func (h *EventHandler) RotateSecret(w http.ResponseWriter, r *http.Request) {
+	rawID := chi.URLParam(r, "eventID")
+	eventID, err := uuid.Parse(rawID)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "bad_request", "invalid event_id")
+		return
+	}
+
+	slog.Debug("[EventHandler.RotateSecret] request", "event_id", eventID)
+
+	plainSecret, err := h.svc.RotateAPISecret(r.Context(), eventID)
+	if err != nil {
+		slog.Warn("[EventHandler.RotateSecret] error", "event_id", eventID, "err", err)
+		// Distinguish "not found" from generic errors
+		if containsNotFound(err) {
+			response.Error(w, http.StatusNotFound, "not_found", "event not found")
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, "internal_error", "failed to rotate secret")
+		return
+	}
+
+	slog.Info("[EventHandler.RotateSecret] rotated", "event_id", eventID)
+	response.JSON(w, http.StatusOK, map[string]string{"api_secret": plainSecret})
+}
+
+// containsNotFound reports whether the error message contains "not found".
+func containsNotFound(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "not found")
 }
 
 // CreateParentChat handles POST /api/admin/events/{eventID}/chat.

@@ -58,6 +58,13 @@ export class AdminApiClient {
     })
   }
 
+  async rotateAPISecret(eventId: string): Promise<{ api_secret: string }> {
+    return this.request<{ api_secret: string }>(
+      'POST',
+      `/api/admin/events/${eventId}/rotate-secret`,
+    )
+  }
+
   // Chats
   async listChats(eventId: string): Promise<Chat[]> {
     return this.request<Chat[]>('GET', `/api/admin/events/${eventId}/chats`)

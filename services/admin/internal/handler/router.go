@@ -49,6 +49,7 @@ func NewRouter(
 			r.Use(middleware.RequireRole("admin"))
 			r.Post("/api/admin/events", eventH.CreateEvent)
 			r.Post("/api/admin/events/{eventID}/chat", eventH.CreateParentChat)
+			r.Post("/api/admin/events/{eventID}/rotate-secret", eventH.RotateSecret)
 			r.Patch("/api/admin/chats/{chatID}/settings", chatH.UpdateSettings)
 			r.Patch("/api/admin/users/{userID}/role", userH.UpdateRole)
 		})

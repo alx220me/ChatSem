@@ -14,6 +14,7 @@ type EventRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Event, error)
 	Create(ctx context.Context, e *domain.Event) error
 	List(ctx context.Context) ([]*domain.Event, error)
+	UpdateAPISecret(ctx context.Context, id uuid.UUID, hashedSecret string) error
 }
 
 // ChatRepository is the minimal chat store interface needed by the admin service.
