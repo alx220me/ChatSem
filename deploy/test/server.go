@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	apiSecret      = "d430dcb3211440b0a0122784f4123fd5a1cbd19a10bee005897ddfd505ab86e9"
+	apiSecret      = "6fe5c9989e47efb3b814a57aca1512c47a2a31ce13ccc7beddbb60273b8b3d58"
 	eventID        = "2e77dd95-786d-4c03-92c0-a2ce794f7bac"
 	authServiceURL = "http://localhost/api/auth/token"
 	listenAddr     = ":8090"
