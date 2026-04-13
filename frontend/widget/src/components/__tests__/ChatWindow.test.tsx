@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { WidgetConfig } from '../../types'
 import type { ApiClient } from '../../api/client'
+import { HttpError } from '../../api/client'
 import type { Chat } from '../../types'
 
 // ── Module-level mocks (must be before component import) ─────────────────
@@ -34,6 +35,7 @@ vi.mock('../../hooks/useChat', () => ({
 
 // Import component after mocks are set up
 import { ChatWindow } from '../ChatWindow'
+import { useChat } from '../../hooks/useChat'
 
 // ── Global stubs ──────────────────────────────────────────────────────────
 
@@ -195,5 +197,83 @@ describe('ChatWindow — floating mode expanded', () => {
     // FAB → expand again
     await user.click(screen.getByTestId('chat-fab'))
     expect(screen.getByTestId('chat-window-floating')).toBeDefined()
+  })
+})
+
+// ── Default mock state (shared across 429 tests) ──────────────────────────
+
+const defaultChatState = {
+  chat: {
+    id: 'chat-1',
+    eventId: 'evt-1',
+    parentId: null,
+    type: 'parent' as const,
+    externalRoomId: null,
+  } as Chat,
+  messages: [],
+  initialHasMore: false,
+  loading: false,
+  error: null,
+  sendMessage: vi.fn(),
+}
+
+describe('ChatWindow — 429 rate limiting', () => {
+  afterEach(() => {
+    vi.mocked(useChat).mockReturnValue({ ...defaultChatState, sendMessage: vi.fn() })
+  })
+
+  it('shows toast with retryAfter when sendMessage is rate limited', async () => {
+    const user = userEvent.setup()
+    const sendMessage = vi.fn().mockRejectedValue(
+      new HttpError(429, 'Too Many Requests', 5),
+    )
+    vi.mocked(useChat).mockReturnValue({ ...defaultChatState, sendMessage })
+
+    render(<ChatWindow config={makeConfig()} api={makeApi()} />)
+
+    const textarea = screen.getByRole('textbox')
+    await user.type(textarea, 'hello')
+    await user.keyboard('{Enter}')
+
+    const toastMsg = await screen.findByText(/Слишком много запросов/)
+    expect(toastMsg).toBeDefined()
+    expect(screen.getByText(/5 сек/)).toBeDefined()
+  })
+
+  it('removes optimistic message when send is rate limited', async () => {
+    const user = userEvent.setup()
+    const sendMessage = vi.fn().mockRejectedValue(
+      new HttpError(429, 'Too Many Requests', 0),
+    )
+    vi.mocked(useChat).mockReturnValue({ ...defaultChatState, sendMessage })
+
+    render(<ChatWindow config={makeConfig()} api={makeApi()} />)
+
+    const textarea = screen.getByRole('textbox')
+    await user.type(textarea, 'my message')
+    await user.keyboard('{Enter}')
+
+    // Wait for toast to confirm the error was handled
+    await screen.findByText(/Слишком много запросов/)
+
+    // The message should not remain in the list (optimistic removed)
+    expect(screen.queryByText('my message')).toBeNull()
+  })
+
+  it('shows fallback toast without countdown when retryAfter is 0', async () => {
+    const user = userEvent.setup()
+    const sendMessage = vi.fn().mockRejectedValue(
+      new HttpError(429, 'Too Many Requests', 0),
+    )
+    vi.mocked(useChat).mockReturnValue({ ...defaultChatState, sendMessage })
+
+    render(<ChatWindow config={makeConfig()} api={makeApi()} />)
+
+    const textarea = screen.getByRole('textbox')
+    await user.type(textarea, 'hello')
+    await user.keyboard('{Enter}')
+
+    const toastMsg = await screen.findByText(/Попробуйте позже/)
+    expect(toastMsg).toBeDefined()
   })
 })
