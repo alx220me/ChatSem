@@ -9,11 +9,18 @@ export class AdminApiClient {
   private baseUrl: string
   private getToken: () => string
   private onUnauthorized?: () => void
+  private on429?: (retryAfter: number) => void
 
-  constructor(baseUrl: string, getToken: () => string, onUnauthorized?: () => void) {
+  constructor(
+    baseUrl: string,
+    getToken: () => string,
+    onUnauthorized?: () => void,
+    on429?: (retryAfter: number) => void,
+  ) {
     this.baseUrl = baseUrl
     this.getToken = getToken
     this.onUnauthorized = onUnauthorized
+    this.on429 = on429
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -32,6 +39,15 @@ export class AdminApiClient {
     })
 
     if (!res.ok) {
+      if (res.status === 429) {
+        const retryAfter = parseInt(res.headers.get('Retry-After') ?? '0', 10) || 0
+        console.warn('[AdminClient] rate limited, retryAfter', retryAfter)
+        this.on429?.(retryAfter)
+        const msg = retryAfter > 0
+          ? `Слишком много запросов. Попробуйте через ${retryAfter} сек.`
+          : 'Слишком много запросов. Попробуйте позже.'
+        throw new Error(msg)
+      }
       if (res.status === 401) {
         console.warn('[AdminClient] session expired, redirecting to login')
         this.onUnauthorized?.()

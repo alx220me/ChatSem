@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { AdminApiClient } from '../api/adminClient'
+import { useToast } from './ToastContext'
 
 interface AuthState {
   token: string | null
@@ -29,6 +30,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [state, setState] = useState<AuthState>(loadSession)
+  const { showToast } = useToast()
 
   const getToken = useCallback(() => state.token ?? '', [state.token])
 
@@ -38,9 +40,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     setState({ token: null, userName: null })
   }, [])
 
+  const on429 = useCallback((retryAfter: number) => {
+    const msg = retryAfter > 0
+      ? `Слишком много запросов. Попробуйте через ${retryAfter} сек.`
+      : 'Слишком много запросов. Попробуйте позже.'
+    showToast(msg, 'warning')
+  }, [showToast])
+
   const api = useMemo(
-    () => (state.token ? new AdminApiClient('', getToken, logout) : null),
-    [state.token, getToken, logout],
+    () => (state.token ? new AdminApiClient('', getToken, logout, on429) : null),
+    [state.token, getToken, logout, on429],
   )
 
   const login = useCallback(async (username: string, password: string) => {

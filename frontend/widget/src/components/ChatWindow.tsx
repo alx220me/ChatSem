@@ -107,7 +107,15 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
       })
       setHasMore(result.has_more)
     } catch (err) {
-      console.warn('[ChatWindow] loadOlderMessages failed', err)
+      if (err instanceof HttpError && err.status === 429) {
+        const msg = err.retryAfter > 0
+          ? `Слишком много запросов. Попробуйте через ${err.retryAfter} сек.`
+          : 'Слишком много запросов. Попробуйте позже.'
+        if (import.meta.env.DEV) console.warn('[ChatWindow] rate limited (loadOlder), retryAfter', err.retryAfter)
+        setToast({ message: msg, variant: 'error' })
+      } else {
+        console.warn('[ChatWindow] loadOlderMessages failed', err)
+      }
     } finally {
       setLoadingMore(false)
     }
@@ -169,7 +177,15 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
           ),
         )
       } catch (err) {
-        console.warn('[ChatWindow] edit failed', err)
+        if (err instanceof HttpError && err.status === 429) {
+          const msg = err.retryAfter > 0
+            ? `Слишком много запросов. Попробуйте через ${err.retryAfter} сек.`
+            : 'Слишком много запросов. Попробуйте позже.'
+          if (import.meta.env.DEV) console.warn('[ChatWindow] rate limited (edit), retryAfter', err.retryAfter)
+          setToast({ message: msg, variant: 'error' })
+        } else {
+          console.warn('[ChatWindow] edit failed', err)
+        }
       }
     },
     [api],
@@ -181,7 +197,15 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         await api.deleteMessage(msgId)
         setAllMessages((prev) => prev.filter((m) => m.id !== msgId))
       } catch (err) {
-        console.warn('[ChatWindow] delete failed', err)
+        if (err instanceof HttpError && err.status === 429) {
+          const msg = err.retryAfter > 0
+            ? `Слишком много запросов. Попробуйте через ${err.retryAfter} сек.`
+            : 'Слишком много запросов. Попробуйте позже.'
+          if (import.meta.env.DEV) console.warn('[ChatWindow] rate limited (delete), retryAfter', err.retryAfter)
+          setToast({ message: msg, variant: 'error' })
+        } else {
+          console.warn('[ChatWindow] delete failed', err)
+        }
       }
     },
     [api],
@@ -257,6 +281,14 @@ export function ChatWindow({ config, api }: ChatWindowProps): React.ReactElement
         }
         if (err instanceof HttpError && (err.status === 403 || err.code === 'banned')) {
           handleBanned()
+          return
+        }
+        if (err instanceof HttpError && err.status === 429) {
+          const msg = err.retryAfter > 0
+            ? `Слишком много запросов. Попробуйте через ${err.retryAfter} сек.`
+            : 'Слишком много запросов. Попробуйте позже.'
+          if (import.meta.env.DEV) console.warn('[ChatWindow] rate limited (send), retryAfter', err.retryAfter)
+          setToast({ message: msg, variant: 'error' })
           return
         }
         throw err
