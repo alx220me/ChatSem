@@ -118,7 +118,7 @@ throw new Error(msg)
 
 ### Фаза 3 — Тесты
 
-#### Task 6 — Тесты: 429 toast в виджете
+#### [x] Task 6 — Тесты: 429 toast в виджете
 **File:** `frontend/widget/src/components/__tests__/ChatWindow.test.tsx`
 
 Добавить тест-кейс в существующий файл:
@@ -129,7 +129,7 @@ throw new Error(msg)
 
 Логирование: нет (тест-файл).
 
-#### Task 7 — Тесты: on429 в AdminApiClient
+#### [x] Task 7 — Тесты: on429 в AdminApiClient
 **File:** `frontend/admin/src/api/adminClient.test.ts` (новый)
 
 - Мокать `fetch` глобально, возвращать `{ status: 429, ok: false, headers: Map{'Retry-After': '10'} }`
