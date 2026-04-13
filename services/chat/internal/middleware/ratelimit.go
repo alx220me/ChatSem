@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"chatsem/shared/pkg/response"
@@ -18,27 +17,49 @@ const (
 	ipRateWindow        = 60 * time.Second
 	pollRateLimit       = 60
 	pollRateWindow      = 60 * time.Second
-	msgRateLimit        = 10
+	msgRateLimit        = 2
 	msgRateWindow       = 10 * time.Second
 	moderatorMultiplier = 3
 )
 
-// allow uses a sliding-window counter in Redis. Returns true if the request should be allowed.
+// allowScript is an atomic Lua sliding-window rate limiter.
+//
+// KEYS[1] — Redis key (sorted set)
+// ARGV[1] — current time in milliseconds
+// ARGV[2] — window start cutoff in milliseconds (now - window)
+// ARGV[3] — request limit
+// ARGV[4] — TTL in milliseconds (= window size)
+//
+// Returns the number of requests in the current window after adding the current one.
+var allowScript = redis.NewScript(`
+local key    = KEYS[1]
+local now    = tonumber(ARGV[1])
+local cutoff = tonumber(ARGV[2])
+local limit  = tonumber(ARGV[3])
+local ttl_ms = tonumber(ARGV[4])
+
+redis.call('ZREMRANGEBYSCORE', key, 0, cutoff)
+redis.call('ZADD', key, now, now)
+local count = redis.call('ZCARD', key)
+redis.call('PEXPIRE', key, ttl_ms)
+return count
+`)
+
+// allow uses an atomic Lua sliding-window counter in Redis.
+// Returns true if the request is within the limit.
 // Fail-open: if Redis is unavailable, returns true.
 func allow(ctx context.Context, rdb *redis.Client, key string, limit int, window time.Duration) (bool, error) {
-	now := time.Now()
-	windowStart := float64(now.Add(-window).UnixMilli())
-	nowScore := float64(now.UnixMilli())
+	now := time.Now().UnixMilli()
+	cutoff := now - window.Milliseconds()
+	ttlMs := window.Milliseconds()
 
-	pipe := rdb.Pipeline()
-	pipe.ZRemRangeByScore(ctx, key, "0", strconv.FormatFloat(windowStart, 'f', 0, 64))
-	pipe.ZAdd(ctx, key, redis.Z{Score: nowScore, Member: nowScore})
-	countCmd := pipe.ZCard(ctx, key)
-	pipe.Expire(ctx, key, window)
-	if _, err := pipe.Exec(ctx); err != nil {
+	count, err := allowScript.Run(ctx, rdb, []string{key},
+		now, cutoff, limit, ttlMs,
+	).Int64()
+	if err != nil {
 		return true, err // fail-open
 	}
-	return countCmd.Val() <= int64(limit), nil
+	return count <= int64(limit), nil
 }
 
 // IPRateLimit limits requests per client IP to 100 requests per 60 seconds.
