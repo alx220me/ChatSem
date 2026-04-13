@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { EventsPage } from './pages/EventsPage'
@@ -39,9 +40,11 @@ function AppRoutes(): React.ReactElement {
 export function App(): React.ReactElement {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   )
 }
